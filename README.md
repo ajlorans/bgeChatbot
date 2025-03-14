@@ -14,6 +14,7 @@ A Next.js-based AI chatbot for Big Green Egg, featuring order tracking, product 
 - 📋 Order status form with input validation
 - 🎨 Customizable theme colors
 - 📱 Responsive design
+- 🧪 Comprehensive unit tests
 
 ## Recent Updates
 
@@ -22,6 +23,7 @@ A Next.js-based AI chatbot for Big Green Egg, featuring order tracking, product 
 - **Cooking Guides**: Added detailed cooking instructions for specific dishes like pizza
 - **Smarter Assembly Guide Detection**: Refined the logic to only show assembly guides when explicitly requested
 - **Order Status Form**: Added a dedicated form for checking order status with validation
+- **Unit Tests**: Added comprehensive test suite for API routes, components, and utility functions
 
 ## Tech Stack
 
@@ -30,6 +32,7 @@ A Next.js-based AI chatbot for Big Green Egg, featuring order tracking, product 
 - Tailwind CSS
 - OpenAI API
 - Shopify API
+- Jest and React Testing Library
 
 ## Environment Variables
 
@@ -68,12 +71,34 @@ npm run dev
 
 5. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+## Testing
+
+The project includes a comprehensive test suite using Jest and React Testing Library:
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage report
+npm run test:coverage
+```
+
+The test suite includes:
+
+- API route tests for order pattern recognition, cooking queries, assembly guides, and customer support
+- Component tests for the OrderStatusForm
+- Utility function tests
+
 ## Project Structure
 
 - `/src/components` - React components including the chatbot and order status form
 - `/src/app/api` - API routes for chat and Shopify integration
 - `/src/lib` - Utility functions and hooks
 - `/public` - Static assets
+- `/src/__tests__` - Test files organized by category
 
 ## Contributing
 
@@ -94,3 +119,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [Tailwind CSS](https://tailwindcss.com/) for styling
 - [Headless UI](https://headlessui.dev/) for accessible components
 - [Heroicons](https://heroicons.com/) for icons
+- [Jest](https://jestjs.io/) and [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/) for testing
