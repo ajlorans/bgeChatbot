@@ -5,13 +5,23 @@ A Next.js-based AI chatbot for Big Green Egg, featuring order tracking, product 
 ## Features
 
 - 🤖 AI-powered chat interface
-- 📦 Order status tracking
+- 📦 Order status tracking with email and order number validation
 - 🛍️ Product recommendations
-- 🤝 Customer support
-- 👨‍🍳 Recipes and cooking tips
+- 🤝 Enhanced customer support with guided assistance
+- 👨‍🍳 Detailed cooking instructions and recipes
+- 🍕 Specialized cooking guides (like pizza cooking)
 - 💬 Real-time chat with quick action buttons
+- 📋 Order status form with input validation
 - 🎨 Customizable theme colors
 - 📱 Responsive design
+
+## Recent Updates
+
+- **Enhanced Order Status Tracking**: Added support for multiple input formats and improved validation
+- **Improved Customer Support**: Chatbot now asks what specific help is needed instead of providing unsolicited information
+- **Cooking Guides**: Added detailed cooking instructions for specific dishes like pizza
+- **Smarter Assembly Guide Detection**: Refined the logic to only show assembly guides when explicitly requested
+- **Order Status Form**: Added a dedicated form for checking order status with validation
 
 ## Tech Stack
 
@@ -20,6 +30,12 @@ A Next.js-based AI chatbot for Big Green Egg, featuring order tracking, product 
 - Tailwind CSS
 - OpenAI API
 - Shopify API
+
+## Environment Variables
+
+- `OPENAI_API_KEY`: Your OpenAI API key
+- `SHOPIFY_STORE_URL`: Your Shopify store URL
+- `SHOPIFY_ACCESS_TOKEN`: Your Shopify access token
 
 ## Getting Started
 
@@ -36,7 +52,7 @@ cd bgeaichatbot
 npm install
 ```
 
-3. Create a `.env.local` file in the root directory and add your API keys:
+3. Set up environment variables:
 
 ```env
 OPENAI_API_KEY=your_openai_api_key
@@ -52,15 +68,9 @@ npm run dev
 
 5. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Environment Variables
-
-- `OPENAI_API_KEY`: Your OpenAI API key
-- `SHOPIFY_STORE_URL`: Your Shopify store URL
-- `SHOPIFY_ACCESS_TOKEN`: Your Shopify access token
-
 ## Project Structure
 
-- `/src/components` - React components including the chatbot
+- `/src/components` - React components including the chatbot and order status form
 - `/src/app/api` - API routes for chat and Shopify integration
 - `/src/lib` - Utility functions and hooks
 - `/public` - Static assets

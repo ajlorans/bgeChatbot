@@ -1,17 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// This will be replaced with your actual Shopify API credentials
+// Shopify credentials - used in the POST function below
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const SHOPIFY_STORE_URL = process.env.SHOPIFY_STORE_URL || "";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const SHOPIFY_ACCESS_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN || "";
 
-// Shopify API version
-const SHOPIFY_API_VERSION = "2024-01";
-
-interface ShopifyLineItem {
-  name: string;
-  quantity: number;
-  price: string;
-}
+// Removed unused Shopify API version constant
 
 interface ShopifyOrder {
   id: string;
@@ -54,6 +49,8 @@ interface GraphQLLineItemEdge {
   };
 }
 
+// Comment out unused function
+/*
 async function getShopifyOrder(orderId: string) {
   try {
     // Remove any non-numeric characters from the order ID
@@ -109,10 +106,11 @@ async function getShopifyOrder(orderId: string) {
     throw error;
   }
 }
+*/
 
 export async function POST(req: NextRequest) {
   try {
-    const { action, orderId, email } = await req.json();
+    const { action, orderId, email, requireBoth } = await req.json();
 
     // Check for required Shopify credentials
     const shopifyStoreUrl = process.env.SHOPIFY_STORE_URL;
@@ -125,9 +123,66 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "getOrderStatus") {
+      // If requireBoth flag is set, ensure both orderId and email are provided
+      if (requireBoth && (!orderId || !email)) {
+        return NextResponse.json({
+          error: "Both order ID and email are required for security purposes",
+        });
+      }
+
       let query;
 
-      if (orderId) {
+      if (orderId && email && requireBoth) {
+        // Search by both order name/number and customer email for security
+        query = `
+          query {
+            customers(first: 1, query: "email:${email}") {
+              edges {
+                node {
+                  orders(first: 10, query: "name:${orderId}") {
+                    edges {
+                      node {
+                        id
+                        name
+                        displayFulfillmentStatus
+                        displayFinancialStatus
+                        createdAt
+                        totalPriceSet {
+                          shopMoney {
+                            amount
+                            currencyCode
+                          }
+                        }
+                        lineItems(first: 10) {
+                          edges {
+                            node {
+                              name
+                              quantity
+                              originalUnitPriceSet {
+                                shopMoney {
+                                  amount
+                                  currencyCode
+                                }
+                              }
+                            }
+                          }
+                        }
+                        fulfillments {
+                          trackingInfo {
+                            number
+                            url
+                          }
+                          estimatedDeliveryAt
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        `;
+      } else if (orderId) {
         // Search by order name/number
         query = `
           query {
@@ -232,60 +287,161 @@ export async function POST(req: NextRequest) {
         ? shopifyStoreUrl
         : `https://${shopifyStoreUrl}`;
 
-      const response = await fetch(
-        `${fullShopifyUrl}/admin/api/2024-01/graphql.json`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Shopify-Access-Token": shopifyAccessToken,
-          },
-          body: JSON.stringify({ query }),
-        }
-      );
+      // Create an AbortController to handle timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
-      if (!response.ok) {
-        console.error("Shopify API error:", await response.text());
-        return NextResponse.json({
-          error: "Failed to fetch order from Shopify",
-        });
-      }
+      try {
+        const response = await fetch(
+          `${fullShopifyUrl}/admin/api/2024-01/graphql.json`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Shopify-Access-Token": shopifyAccessToken,
+            },
+            body: JSON.stringify({ query }),
+            signal: controller.signal,
+          }
+        );
 
-      const result = await response.json();
+        clearTimeout(timeoutId); // Clear the timeout if the request completes
 
-      // Check if there are any errors in the GraphQL response
-      if (result.errors) {
-        console.error("GraphQL errors:", result.errors);
-        return NextResponse.json({
-          error: "Failed to fetch order from Shopify",
-        });
-      }
-
-      // Handle email search results differently
-      if (email) {
-        const customerOrders =
-          result.data?.customers?.edges[0]?.node?.orders?.edges || [];
-
-        if (customerOrders.length === 0) {
+        if (!response.ok) {
+          console.error("Shopify API error:", await response.text());
           return NextResponse.json({
-            error: "No orders found for this email address",
+            error: "Failed to fetch order from Shopify",
           });
         }
 
-        if (customerOrders.length > 1) {
-          const orderList = customerOrders.map((edge: GraphQLOrderEdge) => ({
-            name: edge.node.name,
-            created_at: edge.node.createdAt,
-            financial_status: edge.node.displayFinancialStatus.toLowerCase(),
-          }));
+        const result = await response.json();
 
+        // Check if there are any errors in the GraphQL response
+        if (result.errors) {
+          console.error("GraphQL errors:", result.errors);
           return NextResponse.json({
-            orders: orderList,
+            error: "Failed to fetch order from Shopify",
           });
         }
 
-        // Single order case
-        const orderData = customerOrders[0].node;
+        // Handle email search results differently
+        if (email && requireBoth) {
+          const customerOrders =
+            result.data?.customers?.edges[0]?.node?.orders?.edges || [];
+
+          if (customerOrders.length === 0) {
+            return NextResponse.json({
+              error:
+                "No orders found matching both the email address and order number",
+            });
+          }
+
+          // For security, we only return a single order when both email and order number are provided
+          const orderData = customerOrders[0].node;
+          const transformedOrder: ShopifyOrder = {
+            id: orderData.id,
+            name: orderData.name,
+            fulfillment_status:
+              orderData.displayFulfillmentStatus?.toLowerCase() ||
+              "unfulfilled",
+            financial_status: orderData.displayFinancialStatus.toLowerCase(),
+            created_at: orderData.createdAt,
+            total_price: orderData.totalPriceSet.shopMoney.amount,
+            currency: orderData.totalPriceSet.shopMoney.currencyCode,
+            line_items: orderData.lineItems.edges.map(
+              (edge: GraphQLLineItemEdge) => ({
+                name: edge.node.name,
+                quantity: edge.node.quantity,
+                price: edge.node.originalUnitPriceSet.shopMoney.amount,
+              })
+            ),
+          };
+
+          // Add tracking info if available
+          if (
+            orderData.fulfillments &&
+            orderData.fulfillments.length > 0 &&
+            orderData.fulfillments[0].trackingInfo &&
+            orderData.fulfillments[0].trackingInfo.length > 0
+          ) {
+            transformedOrder.tracking_number =
+              orderData.fulfillments[0].trackingInfo[0].number;
+            transformedOrder.tracking_url =
+              orderData.fulfillments[0].trackingInfo[0].url;
+            transformedOrder.estimated_delivery =
+              orderData.fulfillments[0].estimatedDeliveryAt;
+          }
+
+          return NextResponse.json({
+            order: transformedOrder,
+          });
+        } else if (email) {
+          const customerOrders =
+            result.data?.customers?.edges[0]?.node?.orders?.edges || [];
+
+          if (customerOrders.length === 0) {
+            return NextResponse.json({
+              error: "No orders found for this email address",
+            });
+          }
+
+          if (customerOrders.length > 1) {
+            const orderList = customerOrders.map((edge: GraphQLOrderEdge) => ({
+              name: edge.node.name,
+              created_at: edge.node.createdAt,
+              financial_status: edge.node.displayFinancialStatus.toLowerCase(),
+            }));
+
+            return NextResponse.json({
+              orders: orderList,
+            });
+          }
+
+          // Single order case
+          const orderData = customerOrders[0].node;
+          const transformedOrder: ShopifyOrder = {
+            id: orderData.id,
+            name: orderData.name,
+            fulfillment_status:
+              orderData.displayFulfillmentStatus?.toLowerCase() ||
+              "unfulfilled",
+            financial_status: orderData.displayFinancialStatus.toLowerCase(),
+            created_at: orderData.createdAt,
+            total_price: orderData.totalPriceSet.shopMoney.amount,
+            currency: orderData.totalPriceSet.shopMoney.currencyCode,
+            line_items: orderData.lineItems.edges.map(
+              (edge: GraphQLLineItemEdge) => ({
+                name: edge.node.name,
+                quantity: edge.node.quantity,
+                price: edge.node.originalUnitPriceSet.shopMoney.amount,
+              })
+            ),
+          };
+
+          if (orderData.fulfillments?.[0]?.trackingInfo?.[0]) {
+            const tracking = orderData.fulfillments[0].trackingInfo[0];
+            transformedOrder.tracking_number = tracking.number;
+            transformedOrder.tracking_url = tracking.url;
+            transformedOrder.estimated_delivery =
+              orderData.fulfillments[0].estimatedDeliveryAt;
+          }
+
+          return NextResponse.json({
+            order: transformedOrder,
+          });
+        }
+
+        // Handle order number search results
+        const orders = result.data?.orders?.edges || [];
+
+        if (orders.length === 0) {
+          return NextResponse.json({
+            error: "Order not found",
+          });
+        }
+
+        // Single order response
+        const orderData = orders[0].node;
         const transformedOrder: ShopifyOrder = {
           id: orderData.id,
           name: orderData.name,
@@ -304,6 +460,7 @@ export async function POST(req: NextRequest) {
           ),
         };
 
+        // Add tracking information if available
         if (orderData.fulfillments?.[0]?.trackingInfo?.[0]) {
           const tracking = orderData.fulfillments[0].trackingInfo[0];
           transformedOrder.tracking_number = tracking.number;
@@ -315,47 +472,21 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
           order: transformedOrder,
         });
-      }
+      } catch (error) {
+        clearTimeout(timeoutId); // Clear the timeout if there's an error
+        console.error("Error fetching from Shopify API:", error);
 
-      // Handle order number search results
-      const orders = result.data?.orders?.edges || [];
+        // Check if it's a timeout error
+        if (error instanceof Error && error.name === "AbortError") {
+          return NextResponse.json({
+            error: "Request timed out. Please try again later.",
+          });
+        }
 
-      if (orders.length === 0) {
         return NextResponse.json({
-          error: "Order not found",
+          error: "Failed to fetch order from Shopify",
         });
       }
-
-      // Single order response
-      const orderData = orders[0].node;
-      const transformedOrder: ShopifyOrder = {
-        id: orderData.id,
-        name: orderData.name,
-        fulfillment_status:
-          orderData.displayFulfillmentStatus?.toLowerCase() || "unfulfilled",
-        financial_status: orderData.displayFinancialStatus.toLowerCase(),
-        created_at: orderData.createdAt,
-        total_price: orderData.totalPriceSet.shopMoney.amount,
-        currency: orderData.totalPriceSet.shopMoney.currencyCode,
-        line_items: orderData.lineItems.edges.map((edge: any) => ({
-          name: edge.node.name,
-          quantity: edge.node.quantity,
-          price: edge.node.originalUnitPriceSet.shopMoney.amount,
-        })),
-      };
-
-      // Add tracking information if available
-      if (orderData.fulfillments?.[0]?.trackingInfo?.[0]) {
-        const tracking = orderData.fulfillments[0].trackingInfo[0];
-        transformedOrder.tracking_number = tracking.number;
-        transformedOrder.tracking_url = tracking.url;
-        transformedOrder.estimated_delivery =
-          orderData.fulfillments[0].estimatedDeliveryAt;
-      }
-
-      return NextResponse.json({
-        order: transformedOrder,
-      });
     }
 
     return NextResponse.json({
@@ -369,6 +500,8 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// Comment out unused mock functions
+/*
 function getMockOrderStatus(orderId: string) {
   const currentDate = new Date();
   const orderDate = new Date(currentDate);
@@ -581,3 +714,4 @@ function getMockProductRecommendations(
   const shuffled = filteredProducts.sort(() => 0.5 - Math.random());
   return { products: shuffled.slice(0, 3) };
 }
+*/

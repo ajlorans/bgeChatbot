@@ -30,6 +30,8 @@ export type ChatCategory =
   | "customer_support"
   | "tips_and_tricks"
   | "recipes"
+  | "product_registration"
+  | "merchandise"
   | "general";
 
 export interface ChatRequest {
