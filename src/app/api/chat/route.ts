@@ -6,13 +6,14 @@ import {
   getProductRecommendations,
   getProductBundles,
   recommendEggSize,
-  isProductSelectionQuery,
   generateProductRecommendationMessage,
   generateBundleRecommendationMessage,
   generateEggSizeRecommendationMessage,
   generateGuidedSelectionMessage,
+  isProductSelectionQuery,
   eggSizeRecommendations,
 } from "@/lib/productRecommendations";
+import { handleRecipeRequest } from "@/lib/recipeHandler";
 
 interface OrderItem {
   quantity: number;
@@ -48,6 +49,11 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 
 export async function POST(req: NextRequest) {
   try {
+    // Initialize OpenAI client
+    const openai = new OpenAI({
+      apiKey: OPENAI_API_KEY,
+    });
+
     const { messages } = await req.json();
     const lastMessage = messages[messages.length - 1];
 
@@ -259,6 +265,36 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Check for warranty information inquiries
+    if (
+      lastMessage.content.toLowerCase() ===
+        "i want to know the warranty information" ||
+      lastMessage.content.toLowerCase().includes("warranty information") ||
+      lastMessage.content.toLowerCase().includes("warranty details") ||
+      lastMessage.content.toLowerCase().includes("what is the warranty") ||
+      lastMessage.content.toLowerCase().includes("warranty period") ||
+      lastMessage.content.toLowerCase().includes("how long is the warranty") ||
+      (lastMessage.content.toLowerCase().includes("warranty") &&
+        (lastMessage.content.toLowerCase().includes("know") ||
+          lastMessage.content.toLowerCase().includes("tell me") ||
+          lastMessage.content.toLowerCase().includes("what") ||
+          lastMessage.content.toLowerCase().includes("how")))
+    ) {
+      const warrantyInfoMessage =
+        "Big Green Egg offers different warranty terms depending on the product:\n\n" +
+        "• **Ceramic Components**: Limited Lifetime Warranty for the ceramic base, ceramic dome, ceramic fire ring, ceramic fire box, and ceramic damper top.\n\n" +
+        "• **Metal Components**: 5-year warranty for metal bands, metal hinge, metal cap top, cooking grid, fire grate, and draft door.\n\n" +
+        "• **Wood Products**: 1-year warranty for wooden EGG mates and wooden handlers.\n\n" +
+        "• **Thermometers and Gaskets**: 1-year warranty.\n\n" +
+        "• **Other Accessories**: Warranty periods vary by product.\n\n" +
+        "For complete warranty details and to register your product, please visit our [Warranty Page](https://biggreenegg.com/pages/warranty). If you have specific questions about warranty coverage for your product, please contact our customer support team at Support@BigGreenEgg.com or call 404-344-4323.";
+
+      return NextResponse.json({
+        messages: [createMessage("assistant", warrantyInfoMessage)],
+        category: "customer_support",
+      });
+    }
+
     // Check for product registration request
     if (
       lastMessage.content.toLowerCase().includes("register") &&
@@ -267,7 +303,7 @@ export async function POST(req: NextRequest) {
         lastMessage.content.includes("egg"))
     ) {
       const registrationMessage =
-        "To register your Big Green Egg product for warranty purposes, please visit our official website at [Big Green Egg Warranty Registration](https://biggreenegg.com/pages/warranty) and follow the instructions provided. If you encounter any difficulties, feel free to reach out to our customer service team for assistance.";
+        "Big Green Egg offers different warranty terms depending on the product. The ceramic components of EGG grills have a limited lifetime warranty, while metal components, wood products, and other accessories have varying warranty periods. To register your Big Green Egg product and view detailed warranty information, please visit our official website at [Big Green Egg Warranty Registration](https://biggreenegg.com/pages/warranty) and follow the instructions provided. If you encounter any difficulties, feel free to reach out to our customer service team for assistance.";
 
       return NextResponse.json({
         messages: [createMessage("assistant", registrationMessage)],
@@ -638,13 +674,17 @@ export async function POST(req: NextRequest) {
     ) {
       const supportMessage =
         "I'd be happy to help with customer support. What specific assistance do you need today? I can help with:\n\n" +
-        "• Assembly and setup questions\n" +
-        "• Product troubleshooting\n" +
-        "• Warranty information\n" +
-        "• Replacement parts\n" +
-        "• Cooking techniques\n" +
+        "• Assembly and setup questions\n\n" +
+        "• Product troubleshooting\n\n" +
+        "• Warranty information\n\n" +
+        "• Replacement parts\n\n" +
+        "• Cooking techniques\n\n" +
         "• Maintenance and cleaning\n\n" +
-        "Please let me know what you need help with, and I'll provide the relevant information.";
+        "Please let me know what you need help with, and I'll provide the relevant information.\n\n" +
+        "If you need direct assistance, you can contact our customer support team:\n\n" +
+        "• Email: Support@BigGreenEgg.com\n\n" +
+        "• Phone: 404-344-4323 (404-EGG-HEAD)\n\n" +
+        "• Visit our [Customer Support Page](https://biggreenegg.com/pages/customer-support) for more options";
 
       return NextResponse.json({
         messages: [createMessage("assistant", supportMessage)],
@@ -874,391 +914,10 @@ export async function POST(req: NextRequest) {
         lowerMessage.includes("temperature") ||
         lowerMessage.includes("how to make"))
     ) {
-      // Check if this is a response to a previous recipe preference question
-      let previousRecipeRequest = null;
-      if (messages.length >= 2) {
-        const previousMessage = messages[messages.length - 2];
-        if (
-          previousMessage.role === "assistant" &&
-          previousMessage.content &&
-          previousMessage.content.includes("Would you like me to provide:") &&
-          previousMessage.content.includes(
-            "A detailed recipe with ingredients and instructions"
-          ) &&
-          previousMessage.content.includes(
-            "Let me know which aspects you're most interested in"
-          )
-        ) {
-          // Extract the dish name from the previous message
-          const dishMatch = previousMessage.content.match(
-            /making\s+([a-z\s]+)\s+on your Big Green Egg/i
-          );
-          if (dishMatch && dishMatch[1]) {
-            previousRecipeRequest = dishMatch[1].trim();
-            console.log(
-              "Found previous recipe request for:",
-              previousRecipeRequest
-            );
-          }
-        }
-      }
-
-      // If this is a response to a recipe preference question and mentions "detailed recipe"
-      if (
-        previousRecipeRequest &&
-        (lowerMessage.includes("detailed recipe") ||
-          lowerMessage.includes("recipe with ingredients") ||
-          lowerMessage.includes("detailed") ||
-          lowerMessage.includes("ingredients") ||
-          lowerMessage.includes("instructions") ||
-          lowerMessage.includes("option 1") ||
-          lowerMessage.includes("option one") ||
-          lowerMessage.includes("1") ||
-          lowerMessage === "recipe")
-      ) {
-        console.log("User wants detailed recipe for:", previousRecipeRequest);
-
-        // Check for specific recipes based on the previous request
-        if (
-          previousRecipeRequest.includes("chicken tikka masala") ||
-          previousRecipeRequest.includes("tikka masala") ||
-          previousRecipeRequest.includes("tiki marsala")
-        ) {
-          const tikkaRecipe =
-            "# Chicken Tikka Masala on the Big Green Egg\n\n" +
-            "Here's a delicious recipe for Chicken Tikka Masala cooked on your Big Green Egg:\n\n" +
-            "## Ingredients\n\n" +
-            "**For the chicken marinade:**\n" +
-            "- 2 lbs boneless, skinless chicken thighs, cut into 1-inch pieces\n" +
-            "- 1 cup plain yogurt\n" +
-            "- 2 tablespoons lemon juice\n" +
-            "- 6 cloves garlic, minced\n" +
-            "- 1 tablespoon ginger, grated\n" +
-            "- 2 teaspoons salt\n" +
-            "- 2 teaspoons ground cumin\n" +
-            "- 2 teaspoons garam masala\n" +
-            "- 2 teaspoons paprika\n\n" +
-            "**For the sauce:**\n" +
-            "- 3 tablespoons ghee or oil\n" +
-            "- 1 large onion, finely chopped\n" +
-            "- 4 cloves garlic, minced\n" +
-            "- 1 tablespoon ginger, grated\n" +
-            "- 2 teaspoons ground cumin\n" +
-            "- 2 teaspoons ground turmeric\n" +
-            "- 2 teaspoons ground coriander\n" +
-            "- 2 teaspoons paprika\n" +
-            "- 1 teaspoon garam masala\n" +
-            "- 1 can (14 oz) tomato sauce\n" +
-            "- 1 cup heavy cream\n" +
-            "- Fresh cilantro for garnish\n\n" +
-            "## Instructions\n\n" +
-            "1. **Marinate the chicken**: Combine all marinade ingredients in a bowl, add chicken and coat well. Cover and refrigerate for at least 2 hours, preferably overnight.\n\n" +
-            "2. **Setup your EGG**: Set up your Big Green Egg for direct cooking at 400°F (204°C).\n\n" +
-            "3. **Grill the chicken**: Thread marinated chicken onto skewers and grill for 7-8 minutes, turning occasionally, until chicken is cooked through with nice char marks.\n\n" +
-            "4. **Prepare the sauce**: In a cast iron skillet on the EGG, heat the ghee and sauté onions until soft. Add garlic and ginger, cook for 1 minute. Add all spices and cook for another minute until fragrant.\n\n" +
-            "5. **Finish the dish**: Add tomato sauce and simmer for 10-15 minutes. Stir in the heavy cream and grilled chicken. Simmer for another 5-10 minutes until sauce thickens.\n\n" +
-            "6. **Serve**: Garnish with fresh cilantro and serve with naan bread or rice.\n\n" +
-            "This recipe takes advantage of the EGG's ability to impart smoky flavor to the grilled chicken before it's combined with the rich, creamy sauce. The result is a more complex and flavorful Chicken Tikka Masala than what you'd typically get from stovetop cooking.\n\n" +
-            "Would you like any modifications to this recipe or have questions about the cooking process?";
-
-          return NextResponse.json({
-            messages: [createMessage("assistant", tikkaRecipe)],
-            category: "tips_and_tricks",
-          });
-        }
-
-        if (previousRecipeRequest.includes("brisket")) {
-          const brisketRecipe =
-            "# Smoked Brisket on the Big Green Egg\n\n" +
-            "Here's a classic smoked brisket recipe for your Big Green Egg:\n\n" +
-            "## Ingredients\n\n" +
-            "- 12-14 lb whole beef brisket (packer cut with point and flat)\n" +
-            "- 1/4 cup kosher salt\n" +
-            "- 1/4 cup black pepper, coarsely ground\n" +
-            "- 2 tablespoons garlic powder\n" +
-            "- 2 tablespoons onion powder\n" +
-            "- Optional: 1/4 cup beef broth for spritzing\n\n" +
-            "## Instructions\n\n" +
-            "1. **Prepare the brisket**: Trim excess fat, leaving about 1/4 inch fat cap. Mix salt, pepper, garlic powder, and onion powder to create a rub. Apply rub generously to all sides of the brisket.\n\n" +
-            "2. **Setup your EGG**: Set up your Big Green Egg for indirect cooking with the ConvEGGtor. Add a few chunks of oak or hickory wood for smoke. Stabilize temperature at 250°F (121°C).\n\n" +
-            "3. **Smoke the brisket**: Place brisket on the grill, fat side up. Insert a temperature probe if available. Close the dome and maintain 250°F.\n\n" +
-            "4. **The smoking process**:\n" +
-            "   - Smoke for about 6 hours or until internal temperature reaches 165°F (74°C)\n" +
-            "   - Optional: Spritz with beef broth every hour after the first 3 hours\n" +
-            "   - When internal temperature reaches 165°F, wrap tightly in butcher paper or foil\n" +
-            "   - Continue cooking until internal temperature reaches 203°F (95°C) in the thickest part, approximately 5-6 more hours\n\n" +
-            "5. **Rest**: Remove from the EGG, keep wrapped, and rest for at least 1 hour (preferably 2) in a cooler or insulated container.\n\n" +
-            "6. **Slice and serve**: Slice against the grain about pencil-thickness for the flat, and slightly thicker for the point.\n\n" +
-            "## Tips\n\n" +
-            "- Total cook time will be approximately 1-1.5 hours per pound of brisket\n" +
-            "- The brisket is done when a temperature probe slides in with little resistance, like butter\n" +
-            '- The "stall" occurs around 150-170°F when moisture evaporates and cools the meat - be patient!\n' +
-            "- For bark formation, wait until a dark mahogany color develops before wrapping\n\n" +
-            "Would you like any modifications to this recipe or have questions about the smoking process?";
-
-          return NextResponse.json({
-            messages: [createMessage("assistant", brisketRecipe)],
-            category: "tips_and_tricks",
-          });
-        }
-
-        if (
-          previousRecipeRequest.includes("ribs") ||
-          previousRecipeRequest.includes("pork ribs")
-        ) {
-          const ribsRecipe =
-            "# Perfect Ribs on the Big Green Egg\n\n" +
-            "Here's how to make amazing ribs on your Big Green Egg using the 3-2-1 method:\n\n" +
-            "## Ingredients\n\n" +
-            "- 2 racks of St. Louis cut pork ribs or baby back ribs\n" +
-            "- 1/4 cup yellow mustard (as a binder)\n" +
-            "- 1/2 cup rib rub (recipe below)\n" +
-            "- 1 cup apple juice for spritzing\n" +
-            "- 1/4 cup honey\n" +
-            "- 4 tablespoons butter\n" +
-            "- 1 cup barbecue sauce of your choice\n\n" +
-            "**Rib Rub:**\n" +
-            "- 1/4 cup brown sugar\n" +
-            "- 2 tablespoons paprika\n" +
-            "- 1 tablespoon black pepper\n" +
-            "- 1 tablespoon salt\n" +
-            "- 1 tablespoon garlic powder\n" +
-            "- 1 tablespoon onion powder\n" +
-            "- 1 teaspoon cayenne pepper (optional)\n\n" +
-            "## Instructions\n\n" +
-            "1. **Prepare the ribs**: Remove the membrane from the bone side of the ribs. Apply a thin layer of mustard all over the ribs, then generously apply the rib rub on all sides.\n\n" +
-            "2. **Setup your EGG**: Set up your Big Green Egg for indirect cooking with the ConvEGGtor. Add a few chunks of apple or cherry wood for smoke. Stabilize temperature at 250°F (121°C).\n\n" +
-            "3. **The 3-2-1 Method**:\n" +
-            "   - **3 hours**: Place ribs on the grill, bone side down. Smoke for 3 hours, spritzing with apple juice every 45 minutes after the first hour.\n" +
-            "   - **2 hours**: Remove ribs and place each rack on a large piece of heavy-duty aluminum foil. Add 2 tablespoons of butter and 2 tablespoons of honey on top of each rack. Wrap tightly and return to the EGG for 2 hours.\n" +
-            "   - **1 hour**: Unwrap ribs carefully (save the juices), brush with barbecue sauce, and return to the EGG for a final hour to set the sauce.\n\n" +
-            "4. **Rest and serve**: Remove ribs from the EGG and let rest for 10-15 minutes before cutting between the bones to serve.\n\n" +
-            "## Tips\n\n" +
-            "- For baby back ribs, consider a 2-2-1 method instead as they cook faster than St. Louis cut ribs\n" +
-            "- The ribs are done when you can twist a bone and it starts to pull away from the meat\n" +
-            "- For a spicier rub, increase the cayenne pepper\n" +
-            "- The saved juices from the foil can be mixed with your barbecue sauce for extra flavor\n\n" +
-            "Would you like any modifications to this recipe or have questions about the cooking process?";
-
-          return NextResponse.json({
-            messages: [createMessage("assistant", ribsRecipe)],
-            category: "tips_and_tricks",
-          });
-        }
-
-        // For any other dish, provide a generic detailed recipe
-        const genericDetailedRecipe =
-          `# ${
-            previousRecipeRequest.charAt(0).toUpperCase() +
-            previousRecipeRequest.slice(1)
-          } on the Big Green Egg\n\n` +
-          `Here's a detailed recipe for ${previousRecipeRequest} cooked on your Big Green Egg:\n\n` +
-          `## Ingredients\n\n` +
-          `- Main ingredients for ${previousRecipeRequest} (meat, vegetables, etc.)\n` +
-          `- Seasonings and spices appropriate for the dish\n` +
-          `- Any marinades or sauces needed\n\n` +
-          `## Instructions\n\n` +
-          `1. **Preparation**: Prepare your ingredients and seasonings\n\n` +
-          `2. **Setup your EGG**: Set up your Big Green Egg for the appropriate cooking method (direct/indirect) at the ideal temperature\n\n` +
-          `3. **Cooking Process**: Cook your ${previousRecipeRequest} on the EGG, monitoring temperature and doneness\n\n` +
-          `4. **Finishing Touches**: Add any final seasonings, sauces, or garnishes\n\n` +
-          `5. **Serving**: Serve your perfectly cooked ${previousRecipeRequest}\n\n` +
-          `## Tips for Success\n\n` +
-          `- Temperature control tips specific to this dish\n` +
-          `- Doneness indicators to look for\n` +
-          `- Flavor enhancement suggestions\n\n` +
-          `Would you like me to provide more specific details about any part of this recipe? I can help with cooking temperatures, techniques, or flavor combinations specific to ${previousRecipeRequest}.`;
-
-        return NextResponse.json({
-          messages: [createMessage("assistant", genericDetailedRecipe)],
-          category: "tips_and_tricks",
-        });
-      }
-
-      // Check for pizza-specific queries
-      if (lowerMessage.includes("pizza")) {
-        const pizzaMessage =
-          "Here's how to cook a perfect pizza on your Big Green Egg:\n\n" +
-          "1. **Setup**: Set up your EGG for indirect cooking using the ConvEGGtor at 600-650°F (315-340°C).\n\n" +
-          "2. **Preheat**: Place your pizza stone on the cooking grid and preheat for at least 30 minutes.\n\n" +
-          "3. **Prepare**: While preheating, prepare your pizza with your favorite toppings. Use cornmeal or flour on your pizza peel to help the pizza slide easily.\n\n" +
-          "4. **Cook**: Slide the pizza onto the hot stone and close the dome. Cook for 6-8 minutes, depending on thickness.\n\n" +
-          "5. **Check**: The pizza is done when the crust is golden brown and the cheese is bubbly.\n\n" +
-          "For even better results, consider our [Pizza & Baking Stone](https://biggreenegg.com/collections/pizza/products/pizza-baking-stone) and [Pizza Oven Wedge](https://biggreenegg.com/collections/pizza/products/pizza-oven-wedge-for-large-egg) accessories.\n\n" +
-          "Would you like a specific pizza recipe or have questions about any of these steps?";
-
-        return NextResponse.json({
-          messages: [createMessage("assistant", pizzaMessage)],
-          category: "tips_and_tricks",
-        });
-      }
-
-      // Check for specific recipe requests
-      const recipeRequestPattern =
-        /(?:recipe(?:\s+for)?|how\s+to\s+(?:cook|make)|i\s+want\s+(?:to\s+cook|a\s+recipe\s+for)|can\s+you\s+(?:give|show)\s+me\s+(?:a\s+recipe|how\s+to\s+cook)|cooking)\s+([a-z\s]+)/i;
-      const recipeMatch = lowerMessage.match(recipeRequestPattern);
-
-      if (recipeMatch && recipeMatch[1] && recipeMatch[1].trim().length > 0) {
-        const requestedDish = recipeMatch[1].trim();
-        console.log("Detected specific recipe request for:", requestedDish);
-
-        // Handle specific recipe requests
-        if (
-          requestedDish.includes("chicken tikka masala") ||
-          requestedDish.includes("tikka masala")
-        ) {
-          const tikkaRecipe =
-            "# Chicken Tikka Masala on the Big Green Egg\n\n" +
-            "Here's a delicious recipe for Chicken Tikka Masala cooked on your Big Green Egg:\n\n" +
-            "## Ingredients\n\n" +
-            "**For the chicken marinade:**\n" +
-            "- 2 lbs boneless, skinless chicken thighs, cut into 1-inch pieces\n" +
-            "- 1 cup plain yogurt\n" +
-            "- 2 tablespoons lemon juice\n" +
-            "- 6 cloves garlic, minced\n" +
-            "- 1 tablespoon ginger, grated\n" +
-            "- 2 teaspoons salt\n" +
-            "- 2 teaspoons ground cumin\n" +
-            "- 2 teaspoons garam masala\n" +
-            "- 2 teaspoons paprika\n\n" +
-            "**For the sauce:**\n" +
-            "- 3 tablespoons ghee or oil\n" +
-            "- 1 large onion, finely chopped\n" +
-            "- 4 cloves garlic, minced\n" +
-            "- 1 tablespoon ginger, grated\n" +
-            "- 2 teaspoons ground cumin\n" +
-            "- 2 teaspoons ground turmeric\n" +
-            "- 2 teaspoons ground coriander\n" +
-            "- 2 teaspoons paprika\n" +
-            "- 1 teaspoon garam masala\n" +
-            "- 1 can (14 oz) tomato sauce\n" +
-            "- 1 cup heavy cream\n" +
-            "- Fresh cilantro for garnish\n\n" +
-            "## Instructions\n\n" +
-            "1. **Marinate the chicken**: Combine all marinade ingredients in a bowl, add chicken and coat well. Cover and refrigerate for at least 2 hours, preferably overnight.\n\n" +
-            "2. **Setup your EGG**: Set up your Big Green Egg for direct cooking at 400°F (204°C).\n\n" +
-            "3. **Grill the chicken**: Thread marinated chicken onto skewers and grill for 7-8 minutes, turning occasionally, until chicken is cooked through with nice char marks.\n\n" +
-            "4. **Prepare the sauce**: In a cast iron skillet on the EGG, heat the ghee and sauté onions until soft. Add garlic and ginger, cook for 1 minute. Add all spices and cook for another minute until fragrant.\n\n" +
-            "5. **Finish the dish**: Add tomato sauce and simmer for 10-15 minutes. Stir in the heavy cream and grilled chicken. Simmer for another 5-10 minutes until sauce thickens.\n\n" +
-            "6. **Serve**: Garnish with fresh cilantro and serve with naan bread or rice.\n\n" +
-            "This recipe takes advantage of the EGG's ability to impart smoky flavor to the grilled chicken before it's combined with the rich, creamy sauce. The result is a more complex and flavorful Chicken Tikka Masala than what you'd typically get from stovetop cooking.\n\n" +
-            "Would you like any modifications to this recipe or have questions about the cooking process?";
-
-          return NextResponse.json({
-            messages: [createMessage("assistant", tikkaRecipe)],
-            category: "tips_and_tricks",
-          });
-        }
-
-        if (requestedDish.includes("brisket")) {
-          const brisketRecipe =
-            "# Smoked Brisket on the Big Green Egg\n\n" +
-            "Here's a classic smoked brisket recipe for your Big Green Egg:\n\n" +
-            "## Ingredients\n\n" +
-            "- 12-14 lb whole beef brisket (packer cut with point and flat)\n" +
-            "- 1/4 cup kosher salt\n" +
-            "- 1/4 cup black pepper, coarsely ground\n" +
-            "- 2 tablespoons garlic powder\n" +
-            "- 2 tablespoons onion powder\n" +
-            "- Optional: 1/4 cup beef broth for spritzing\n\n" +
-            "## Instructions\n\n" +
-            "1. **Prepare the brisket**: Trim excess fat, leaving about 1/4 inch fat cap. Mix salt, pepper, garlic powder, and onion powder to create a rub. Apply rub generously to all sides of the brisket.\n\n" +
-            "2. **Setup your EGG**: Set up your Big Green Egg for indirect cooking with the ConvEGGtor. Add a few chunks of oak or hickory wood for smoke. Stabilize temperature at 250°F (121°C).\n\n" +
-            "3. **Smoke the brisket**: Place brisket on the grill, fat side up. Insert a temperature probe if available. Close the dome and maintain 250°F.\n\n" +
-            "4. **The smoking process**:\n" +
-            "   - Smoke for about 6 hours or until internal temperature reaches 165°F (74°C)\n" +
-            "   - Optional: Spritz with beef broth every hour after the first 3 hours\n" +
-            "   - When internal temperature reaches 165°F, wrap tightly in butcher paper or foil\n" +
-            "   - Continue cooking until internal temperature reaches 203°F (95°C) in the thickest part, approximately 5-6 more hours\n\n" +
-            "5. **Rest**: Remove from the EGG, keep wrapped, and rest for at least 1 hour (preferably 2) in a cooler or insulated container.\n\n" +
-            "6. **Slice and serve**: Slice against the grain about pencil-thickness for the flat, and slightly thicker for the point.\n\n" +
-            "## Tips\n\n" +
-            "- Total cook time will be approximately 1-1.5 hours per pound of brisket\n" +
-            "- The brisket is done when a temperature probe slides in with little resistance, like butter\n" +
-            '- The "stall" occurs around 150-170°F when moisture evaporates and cools the meat - be patient!\n' +
-            "- For bark formation, wait until a dark mahogany color develops before wrapping\n\n" +
-            "Would you like any modifications to this recipe or have questions about the smoking process?";
-
-          return NextResponse.json({
-            messages: [createMessage("assistant", brisketRecipe)],
-            category: "tips_and_tricks",
-          });
-        }
-
-        if (
-          requestedDish.includes("ribs") ||
-          requestedDish.includes("pork ribs")
-        ) {
-          const ribsRecipe =
-            "# Perfect Ribs on the Big Green Egg\n\n" +
-            "Here's how to make amazing ribs on your Big Green Egg using the 3-2-1 method:\n\n" +
-            "## Ingredients\n\n" +
-            "- 2 racks of St. Louis cut pork ribs or baby back ribs\n" +
-            "- 1/4 cup yellow mustard (as a binder)\n" +
-            "- 1/2 cup rib rub (recipe below)\n" +
-            "- 1 cup apple juice for spritzing\n" +
-            "- 1/4 cup honey\n" +
-            "- 4 tablespoons butter\n" +
-            "- 1 cup barbecue sauce of your choice\n\n" +
-            "**Rib Rub:**\n" +
-            "- 1/4 cup brown sugar\n" +
-            "- 2 tablespoons paprika\n" +
-            "- 1 tablespoon black pepper\n" +
-            "- 1 tablespoon salt\n" +
-            "- 1 tablespoon garlic powder\n" +
-            "- 1 tablespoon onion powder\n" +
-            "- 1 teaspoon cayenne pepper (optional)\n\n" +
-            "## Instructions\n\n" +
-            "1. **Prepare the ribs**: Remove the membrane from the bone side of the ribs. Apply a thin layer of mustard all over the ribs, then generously apply the rib rub on all sides.\n\n" +
-            "2. **Setup your EGG**: Set up your Big Green Egg for indirect cooking with the ConvEGGtor. Add a few chunks of apple or cherry wood for smoke. Stabilize temperature at 250°F (121°C).\n\n" +
-            "3. **The 3-2-1 Method**:\n" +
-            "   - **3 hours**: Place ribs on the grill, bone side down. Smoke for 3 hours, spritzing with apple juice every 45 minutes after the first hour.\n" +
-            "   - **2 hours**: Remove ribs and place each rack on a large piece of heavy-duty aluminum foil. Add 2 tablespoons of butter and 2 tablespoons of honey on top of each rack. Wrap tightly and return to the EGG for 2 hours.\n" +
-            "   - **1 hour**: Unwrap ribs carefully (save the juices), brush with barbecue sauce, and return to the EGG for a final hour to set the sauce.\n\n" +
-            "4. **Rest and serve**: Remove ribs from the EGG and let rest for 10-15 minutes before cutting between the bones to serve.\n\n" +
-            "## Tips\n\n" +
-            "- For baby back ribs, consider a 2-2-1 method instead as they cook faster than St. Louis cut ribs\n" +
-            "- The ribs are done when you can twist a bone and it starts to pull away from the meat\n" +
-            "- For a spicier rub, increase the cayenne pepper\n" +
-            "- The saved juices from the foil can be mixed with your barbecue sauce for extra flavor\n\n" +
-            "Would you like any modifications to this recipe or have questions about the cooking process?";
-
-          return NextResponse.json({
-            messages: [createMessage("assistant", ribsRecipe)],
-            category: "tips_and_tricks",
-          });
-        }
-
-        // Generic response for other specific dishes
-        const genericRecipeResponse =
-          `I'd be happy to help you cook ${requestedDish} on your Big Green Egg! The BGE is perfect for this dish because of its excellent temperature control and ability to infuse smoky flavor.\n\n` +
-          `Would you like me to provide:\n\n` +
-          `1. A detailed recipe with ingredients and instructions\n` +
-          `2. Specific BGE temperature and setup recommendations\n` +
-          `3. Tips for achieving the best results\n\n` +
-          `Let me know which aspects you're most interested in, and I'll provide tailored guidance for making ${requestedDish} on your Big Green Egg.`;
-
-        return NextResponse.json({
-          messages: [createMessage("assistant", genericRecipeResponse)],
-          category: "tips_and_tricks",
-        });
-      }
-
-      // General cooking query
-      const cookingMessage =
-        "I'd be happy to help with cooking tips! What specific dish or cooking technique would you like to learn about? I can provide guidance on:\n\n" +
-        "• Grilling techniques (direct/indirect heat)\n" +
-        "• Smoking methods and wood choices\n" +
-        "• Temperature control tips\n" +
-        "• Specific recipes (pizza, brisket, ribs, etc.)\n" +
-        "• Baking in your EGG\n" +
-        "• Roasting techniques\n\n" +
-        "Let me know what you'd like to cook, and I'll provide specific instructions!";
-
-      return NextResponse.json({
-        messages: [createMessage("assistant", cookingMessage)],
-        category: "tips_and_tricks",
-      });
+      // Use the new recipe handler
+      return NextResponse.json(
+        await handleRecipeRequest(openai, lowerMessage, messages)
+      );
     }
 
     // Check if this is a product inquiry (looking for, want to buy, etc.)
@@ -1744,11 +1403,6 @@ export async function POST(req: NextRequest) {
         ],
       });
     }
-
-    // Initialize OpenAI client
-    const openai = new OpenAI({
-      apiKey: OPENAI_API_KEY,
-    });
 
     // Prepare messages for OpenAI
     const systemMessage = createMessage("system", defaultSystemPrompt);

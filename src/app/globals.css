@@ -30,16 +30,20 @@ body {
   width: 100%;
   max-width: 100%;
   overflow: hidden;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
 }
 
 .product-recommendation-wrapper a {
   color: #006838 !important; /* BGE green */
   font-weight: 500;
   text-decoration: none;
+  transition: all 0.2s ease;
 }
 
 .product-recommendation-wrapper a:hover {
   text-decoration: underline;
+  opacity: 0.9;
 }
 
 /* Ensure text is visible in dark mode */
@@ -54,4 +58,37 @@ body {
 
 .dark .prose .product-recommendation-wrapper {
   color: #f3f4f6 !important;
+}
+
+/* Enhanced list styling */
+.prose ul li::marker {
+  color: #006838; /* BGE green */
+}
+
+.prose ol li::marker {
+  color: #006838; /* BGE green */
+  font-weight: bold;
+}
+
+/* Improve spacing for bullet points */
+.prose ul,
+.prose ol {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+.prose li {
+  margin-bottom: 0.5rem;
+  padding-left: 0.5rem;
+}
+
+/* Enhance links */
+.prose a {
+  text-decoration: none;
+  border-bottom: 1px solid #006838;
+  transition: all 0.2s ease;
+}
+
+.prose a:hover {
+  background-color: rgba(0, 104, 56, 0.1);
 }

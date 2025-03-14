@@ -192,10 +192,10 @@ const Chatbot: React.FC<ChatbotProps> = ({
         message = "I'd like some customer support assistance.";
         break;
       case "tips_and_tricks":
-        message = "Can you share some cooking tips or recipes?";
+        message = "I'd like to find a recipe for cooking on my Big Green Egg.";
         break;
       case "product_registration":
-        message = "I need to register my product";
+        message = "I want to know the warranty information";
         break;
       case "browse_products":
         message = "I want to browse your products";
@@ -274,6 +274,43 @@ const Chatbot: React.FC<ChatbotProps> = ({
               className="text-green-700 underline hover:text-green-900"
             />
           ),
+          ul: ({ ...props }) => (
+            <ul {...props} className="list-disc pl-5 space-y-2 my-4" />
+          ),
+          ol: ({ ...props }) => (
+            <ol {...props} className="list-decimal pl-5 space-y-2 my-4" />
+          ),
+          li: ({ ...props }) => <li {...props} className="pl-1 mb-2" />,
+          p: ({ ...props }) => (
+            <p {...props} className="mb-4 leading-relaxed" />
+          ),
+          h1: ({ ...props }) => (
+            <h1 {...props} className="text-xl font-bold mb-4 mt-6" />
+          ),
+          h2: ({ ...props }) => (
+            <h2 {...props} className="text-lg font-bold mb-3 mt-5" />
+          ),
+          h3: ({ ...props }) => (
+            <h3 {...props} className="text-md font-bold mb-3 mt-4" />
+          ),
+          blockquote: ({ ...props }) => (
+            <blockquote
+              {...props}
+              className="border-l-4 border-gray-300 pl-4 italic my-4"
+            />
+          ),
+          code: ({ ...props }) => (
+            <code
+              {...props}
+              className="bg-gray-100 rounded px-1 py-0.5 text-sm"
+            />
+          ),
+          pre: ({ ...props }) => (
+            <pre
+              {...props}
+              className="bg-gray-100 rounded p-3 overflow-x-auto my-4"
+            />
+          ),
         }}
       >
         {content}
@@ -317,20 +354,20 @@ const Chatbot: React.FC<ChatbotProps> = ({
           </div>
 
           {/* Messages */}
-          <div className="flex-1 p-4 overflow-y-auto">
+          <div className="flex-1 p-5 overflow-y-auto bg-gray-50">
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={`mb-4 flex ${
+                className={`mb-6 flex ${
                   message.role === "user" ? "justify-end" : "justify-start"
                 }`}
               >
                 <div
-                  className={`max-w-[90%] rounded-lg px-4 py-3 ${
+                  className={`max-w-[90%] rounded-lg px-5 py-4 ${
                     message.role === "user"
                       ? "bg-blue-600 text-white ml-auto"
                       : "bg-gray-100 text-gray-900 mr-auto"
-                  } shadow-sm`}
+                  } shadow-md`}
                 >
                   <div
                     className={`prose prose-sm max-w-none ${
@@ -350,11 +387,15 @@ const Chatbot: React.FC<ChatbotProps> = ({
                     [&_.pending]:text-yellow-600 [&_.pending]:font-medium
                     [&_.refunded]:text-red-600 [&_.refunded]:font-medium
                     [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mb-3 [&_h3]:text-gray-900
-                    [&_p]:mb-2 [&_p]:leading-relaxed
-                    [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:mb-3
-                    [&_li]:mb-1
+                    [&_p]:mb-3 [&_p]:leading-relaxed
+                    [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-4 [&_ul]:space-y-2
+                    [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-4 [&_ol]:space-y-2
+                    [&_li]:mb-2 [&_li]:pl-1
                     [&_strong]:font-semibold
-                    [&_a]:text-blue-600 [&_a]:hover:underline`}
+                    [&_a]:text-blue-600 [&_a]:hover:underline
+                    [&_blockquote]:border-l-4 [&_blockquote]:border-gray-300 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-4
+                    [&_code]:bg-gray-100 [&_code]:rounded [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-sm
+                    [&_pre]:bg-gray-100 [&_pre]:rounded [&_pre]:p-3 [&_pre]:overflow-x-auto [&_pre]:my-4`}
                   >
                     {renderMessage(message.content, message.category)}
                   </div>
@@ -405,13 +446,13 @@ const Chatbot: React.FC<ChatbotProps> = ({
                     onClick={() => handleQuickAction("tips_and_tricks")}
                     className="p-2 text-sm bg-white border-2 border-green-700 text-green-700 rounded-lg hover:bg-green-50 transition-colors"
                   >
-                    👨‍🍳 Recipes & Tips
+                    👨‍🍳 Recipes
                   </button>
                   <button
                     onClick={() => handleQuickAction("product_registration")}
                     className="p-2 text-sm bg-white border-2 border-green-700 text-green-700 rounded-lg hover:bg-green-50 transition-colors"
                   >
-                    📝 Register Product
+                    📝 Warranty/Registration
                   </button>
                   <button
                     onClick={() => handleQuickAction("browse_products")}

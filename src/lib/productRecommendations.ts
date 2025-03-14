@@ -536,10 +536,11 @@ export function generateEggSizeRecommendationMessage(
   if (!recommendation) {
     return (
       "To help you find the perfect Big Green Egg size, could you tell me:\n\n" +
-      "1. How many people do you typically cook for?\n" +
-      "2. Do you entertain frequently?\n" +
-      "3. How much outdoor space do you have?\n" +
-      "4. Do you need portability (for camping, tailgating, etc.)?"
+      "• How many people do you typically cook for?\n\n" +
+      "• Do you entertain frequently?\n\n" +
+      "• How much outdoor space do you have?\n\n" +
+      "• Do you need portability (for camping, tailgating, etc.)?\n\n" +
+      "If you're looking for accessories instead, please let me know which size EGG you have, and I can recommend the perfect accessories for your needs."
     );
   }
 
@@ -555,9 +556,9 @@ export function generateEggSizeRecommendationMessage(
 export function generateGuidedSelectionMessage(): string {
   return (
     "I'd be happy to help you find the perfect Big Green Egg products! To get started, could you tell me:\n\n" +
-    "1. Do you already own a Big Green Egg? If so, which size?\n" +
-    "2. What type of cooking are you most interested in? (Grilling, smoking, baking, pizza, etc.)\n" +
-    "3. How many people do you typically cook for?\n\n" +
+    "• Do you already own a Big Green Egg? If so, which size?\n\n" +
+    "• What type of cooking are you most interested in? (Grilling, smoking, baking, pizza, etc.)\n\n" +
+    "• How many people do you typically cook for?\n\n" +
     "This will help me recommend the best products for your specific needs."
   );
 }
