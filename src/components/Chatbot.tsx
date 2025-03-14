@@ -11,11 +11,14 @@ import ReactMarkdown from "react-markdown";
 import { useChatbot } from "@/lib/useChatbot";
 import { useChatbotContext } from "./ChatbotProvider";
 import { ProductRecommendation } from "@/app/components/ProductRecommendation";
+import { rateLimiter } from "@/lib/rateLimiter";
+import { sanitizeInput, sanitizeOrderNumber, sanitizeEmail } from "@/lib/sanitizer";
 
 interface ChatbotProps {
   initialMessage?: string;
   primaryColor?: string;
   botName?: string;
+  showChatBubble?: boolean;
 }
 
 // Order Status Form Component
@@ -148,6 +151,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
   initialMessage = "Hi there! I'm your Big Green Egg assistant. How can I help you today?",
   primaryColor = "#006838", // BGE green
   botName = "BGE Assistant",
+  showChatBubble = true,
 }) => {
   const { isOpen, toggleChat, closeChat } = useChatbotContext();
   const [inputValue, setInputValue] = useState("");
@@ -209,7 +213,18 @@ const Chatbot: React.FC<ChatbotProps> = ({
     orderNumber: string,
     email: string
   ) => {
-    const message = `${orderNumber} ${email}`;
+    // Sanitize inputs
+    const sanitizedOrderNumber = sanitizeOrderNumber(orderNumber);
+    const sanitizedEmail = sanitizeEmail(email);
+
+    // Check rate limiting
+    const identifier = `order_status_${sanitizedEmail}`;
+    if (rateLimiter.isRateLimited(identifier)) {
+      alert("Too many requests. Please try again later.");
+      return;
+    }
+
+    const message = `${sanitizedOrderNumber} ${sanitizedEmail}`;
     await sendMessage(message);
     setShowOrderStatusForm(false);
   };
@@ -219,15 +234,25 @@ const Chatbot: React.FC<ChatbotProps> = ({
 
     if (!inputValue.trim() || isLoading) return;
 
+    // Sanitize input
+    const sanitizedInput = sanitizeInput(inputValue);
+
+    // Check rate limiting
+    const identifier = `chat_message_${Date.now()}`;
+    if (rateLimiter.isRateLimited(identifier)) {
+      alert("Too many messages. Please wait a moment before sending more.");
+      return;
+    }
+
     // Check if the input looks like an order status request
     const orderStatusRegex = /order|status|track|where.*order|check.*order/i;
-    if (orderStatusRegex.test(inputValue.toLowerCase())) {
+    if (orderStatusRegex.test(sanitizedInput.toLowerCase())) {
       setShowOrderStatusForm(true);
       setInputValue("");
       return;
     }
 
-    await sendMessage(inputValue);
+    await sendMessage(sanitizedInput);
     setInputValue("");
   };
 
@@ -249,6 +274,36 @@ const Chatbot: React.FC<ChatbotProps> = ({
             bundles={[]} // In a real implementation, you would parse bundles from the message or fetch them
           />
         </div>
+      );
+    }
+
+    // If it's a product search result, render with enhanced styling
+    if (category === "product") {
+      return (
+        <ReactMarkdown
+          components={{
+            a: ({ ...props }) => (
+              <a
+                {...props}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-green-700 underline hover:text-green-900 font-medium"
+              />
+            ),
+            strong: ({ ...props }) => (
+              <strong {...props} className="font-bold text-green-800" />
+            ),
+            p: ({ ...props }) => (
+              <p {...props} className="mb-4 leading-relaxed" />
+            ),
+            ul: ({ ...props }) => (
+              <ul {...props} className="list-disc pl-5 space-y-2 my-4" />
+            ),
+            li: ({ ...props }) => <li {...props} className="pl-1 mb-2" />,
+          }}
+        >
+          {content}
+        </ReactMarkdown>
       );
     }
 
@@ -322,14 +377,22 @@ const Chatbot: React.FC<ChatbotProps> = ({
     <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end">
       {/* Chat button - only show when chat is closed */}
       {!isOpen && (
-        <button
-          onClick={toggleChat}
-          className="flex items-center justify-center w-14 h-14 rounded-full shadow-lg focus:outline-none transition-transform hover:scale-110"
-          style={{ backgroundColor: primaryColor }}
-          aria-label="Open chat"
-        >
-          <ChatBubbleLeftRightIcon className="w-6 h-6 text-white" />
-        </button>
+        <>
+          {/* Chat bubble prompt - only show if showChatBubble is true */}
+          {showChatBubble && (
+            <div className="mb-2 bg-white rounded-lg shadow-md p-3 max-w-xs" style={{ borderColor: primaryColor, borderWidth: '1px' }}>
+              <p className="text-sm font-medium" style={{ color: primaryColor }}>Need help or have questions? Chat with me!</p>
+            </div>
+          )}
+          <button
+            onClick={toggleChat}
+            className="flex items-center justify-center w-14 h-14 rounded-full shadow-lg focus:outline-none transition-transform hover:scale-110"
+            style={{ backgroundColor: primaryColor }}
+            aria-label="Open chat"
+          >
+            <ChatBubbleLeftRightIcon className="w-6 h-6 text-white" />
+          </button>
+        </>
       )}
 
       {/* Chat window */}
@@ -346,10 +409,10 @@ const Chatbot: React.FC<ChatbotProps> = ({
             <h3 className="font-medium text-white">{botName}</h3>
             <button
               onClick={closeChat}
-              className="text-white hover:text-gray-200 focus:outline-none"
+              className="text-white hover:text-gray-200 focus:outline-none p-2 rounded-full hover:bg-white/10 transition-colors"
               aria-label="Close chat"
             >
-              <XMarkIcon className="w-5 h-5" />
+              <XMarkIcon className="w-6 h-6" />
             </button>
           </div>
 
@@ -434,7 +497,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
                     onClick={() => handleQuickAction("product_recommendation")}
                     className="p-2 text-sm bg-white border-2 border-green-700 text-green-700 rounded-lg hover:bg-green-50 transition-colors"
                   >
-                    🛍️ Product Recommendations
+                    🛍️ Egg Recommendation
                   </button>
                   <button
                     onClick={() => handleQuickAction("customer_support")}

@@ -12,19 +12,19 @@ export default function Home() {
         <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
           <a
             className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://biggreenegg.com"
+            href="https://github.com/ajlorans/bgeChatbot"
             target="_blank"
             rel="noopener noreferrer"
           >
-            By Big Green Egg
+            By Austin Lorax
           </a>
         </div>
       </div>
 
       <div className="relative flex place-items-center">
         <div className="bg-green-700 text-white p-4 rounded-md">
-          <h2 className="text-xl font-bold">Big Green Egg</h2>
-          <p className="text-sm">Premium Ceramic Grills</p>
+          <a href="https://biggreenegg.com" className="text-xl font-bold">Big Green Egg</a>
+          {/*<p className="text-sm">Premium Ceramic Grills</p>*/}
         </div>
       </div>
 
@@ -35,7 +35,7 @@ export default function Home() {
           description="Check the status of your orders and get shipping updates."
         />
         <FeatureCard
-          title="Product Recommendations"
+          title="Egg Recommendation"
           description="Get personalized product recommendations based on your needs."
         />
         <FeatureCard

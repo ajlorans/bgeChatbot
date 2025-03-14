@@ -14,6 +14,9 @@ import {
   eggSizeRecommendations,
 } from "@/lib/productRecommendations";
 import { handleRecipeRequest } from "@/lib/recipeHandler";
+import { getAllowedOrigins, corsConfig } from "@/config/cors";
+import { searchFAQs, generateFAQResponse } from "@/lib/faqData";
+import { searchProducts, generateProductResponse } from "@/lib/productDatabase";
 
 interface OrderItem {
   quantity: number;
@@ -47,7 +50,36 @@ function isOpenAIError(
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 
+// CORS middleware for the chat API
+export async function OPTIONS(req: NextRequest) {
+  const origin = req.headers.get('origin');
+  const allowedOrigins = getAllowedOrigins();
+
+  if (origin && allowedOrigins.includes(origin)) {
+    return new NextResponse(null, {
+      status: 200,
+      headers: {
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Methods': corsConfig.methods.join(', '),
+        'Access-Control-Allow-Headers': corsConfig.allowedHeaders.join(', '),
+        'Access-Control-Max-Age': corsConfig.maxAge.toString(),
+        'Access-Control-Allow-Credentials': 'true'
+      }
+    });
+  }
+
+  return new NextResponse(null, { status: 403 });
+}
+
 export async function POST(req: NextRequest) {
+  const origin = req.headers.get('origin');
+  const allowedOrigins = getAllowedOrigins();
+
+  // Check if the origin is allowed
+  if (!origin || !allowedOrigins.includes(origin)) {
+    return new NextResponse(null, { status: 403 });
+  }
+
   try {
     // Initialize OpenAI client
     const openai = new OpenAI({
@@ -129,7 +161,39 @@ export async function POST(req: NextRequest) {
 
           clearTimeout(timeoutId); // Clear the timeout if the request completes
 
-          const data = await response.json();
+          // Check if the response status is ok before attempting to parse JSON
+          if (!response.ok) {
+            console.error(`Shopify API error: ${response.status} ${response.statusText}`);
+            
+            let errorMessage = "I apologize, but I encountered an issue while checking your order status. ";
+            
+            if (response.status === 403) {
+              errorMessage += "There seems to be an authorization issue. Please try again later or contact customer service.";
+            } else {
+              errorMessage += "Please try again later or contact our customer service for assistance.";
+            }
+            
+            return NextResponse.json({
+              messages: [createMessage("assistant", errorMessage)],
+            });
+          }
+          
+          // Safely handle JSON parsing
+          let data;
+          try {
+            const responseText = await response.text();
+            if (!responseText || responseText.trim() === '') {
+              throw new Error("Empty response from server");
+            }
+            data = JSON.parse(responseText);
+          } catch (parseError) {
+            console.error("Error parsing JSON response:", parseError);
+            return NextResponse.json({
+              messages: [createMessage("assistant", 
+                "I apologize, but I encountered an issue while processing your order information. Please try again later or contact our customer service for assistance."
+              )],
+            });
+          }
 
           if (data.error) {
             let errorMessage =
@@ -333,80 +397,91 @@ export async function POST(req: NextRequest) {
       ) {
         console.log("User is responding to accessory size inquiry");
 
-        // Determine which size EGG they mentioned
-        let eggSize = "Large"; // Default to Large if we can't determine
+        // If they just say "yes", use the size from the previous recommendation
+        if (lowerMessage === "yes" || lowerMessage === "y") {
+          // Look back through messages to find the last egg size recommendation
+          let recommendedSize = "Large"; // Default to Large
+          for (let i = messages.length - 2; i >= 0; i--) {
+            const msg = messages[i];
+            if (msg.role === "assistant" && msg.content) {
+              if (msg.content.includes("2XL Big Green Egg")) {
+                recommendedSize = "2XL";
+                break;
+              } else if (msg.content.includes("XL Big Green Egg")) {
+                recommendedSize = "XL";
+                break;
+              } else if (msg.content.includes("Large Big Green Egg")) {
+                recommendedSize = "Large";
+                break;
+              } else if (msg.content.includes("Medium Big Green Egg")) {
+                recommendedSize = "Medium";
+                break;
+              } else if (msg.content.includes("Small Big Green Egg")) {
+                recommendedSize = "Small";
+                break;
+              } else if (msg.content.includes("MiniMax Big Green Egg")) {
+                recommendedSize = "MiniMax";
+                break;
+              } else if (msg.content.includes("Mini Big Green Egg")) {
+                recommendedSize = "Mini";
+                break;
+              }
+            }
+          }
 
-        if (
-          lowerMessage.includes("2xl") ||
-          lowerMessage.includes("2 xl") ||
-          lowerMessage.includes("xxl") ||
-          lowerMessage.includes("2x large") ||
-          lowerMessage.includes("double extra large")
-        ) {
-          eggSize = "2XL";
-        } else if (
-          lowerMessage.includes("xl") ||
-          lowerMessage.includes("x large") ||
-          (lowerMessage.includes("extra large") &&
-            !lowerMessage.includes("2xl") &&
-            !lowerMessage.includes("2 xl") &&
-            !lowerMessage.includes("xxl"))
-        ) {
-          eggSize = "XL";
-        } else if (
-          lowerMessage.includes("large") &&
-          !lowerMessage.includes("xl") &&
-          !lowerMessage.includes("extra large") &&
-          !lowerMessage.includes("2xl") &&
-          !lowerMessage.includes("2 xl") &&
-          !lowerMessage.includes("xxl")
-        ) {
-          eggSize = "Large";
-        } else if (
-          lowerMessage.includes("medium") ||
-          lowerMessage.includes("med")
-        ) {
-          eggSize = "Medium";
-        } else if (
-          lowerMessage.includes("small") &&
-          !lowerMessage.includes("minimax") &&
-          !lowerMessage.includes("mini max")
-        ) {
-          eggSize = "Small";
-        } else if (
-          lowerMessage.includes("minimax") ||
-          lowerMessage.includes("mini max")
-        ) {
-          eggSize = "MiniMax";
-        } else if (
-          lowerMessage.includes("mini") &&
-          !lowerMessage.includes("minimax") &&
-          !lowerMessage.includes("mini max")
-        ) {
-          eggSize = "Mini";
-        } else if (
-          lowerMessage.includes("don't have") ||
-          lowerMessage.includes("dont have") ||
-          lowerMessage.includes("do not have") ||
-          lowerMessage.includes("looking to buy") ||
-          lowerMessage.includes("planning to buy") ||
-          lowerMessage.includes("want to buy") ||
-          lowerMessage.includes("new purchase")
-        ) {
-          // They don't have an EGG yet
-          const noEggMessage =
-            "Since you don't have an EGG yet, I'd be happy to help you choose both the right size and accessories. To recommend the perfect Big Green Egg for your needs, could you tell me:\n\n" +
-            "• How many people do you typically cook for?\n" +
-            "• Do you entertain frequently?\n" +
-            "• How much outdoor space do you have?\n" +
-            "• Do you need portability (for camping, tailgating, etc.)?\n\n" +
-            "Once we determine the right size, I can recommend the perfect accessories to enhance your cooking experience!";
+          // Generate accessory recommendations based on the recommended size
+          let accessoryMessage = `Here are some essential accessories that work perfectly with your ${recommendedSize} Big Green Egg:\n\n`;
+
+          if (recommendedSize === "2XL" || recommendedSize === "XL") {
+            accessoryMessage +=
+              "1. **[5-Piece EGGspander Kit for XL](https://biggreenegg.com/collections/eggspander-system/products/5-piece-eggspander-kit-for-xl)** ($349.99) - This versatile system allows you to cook multiple dishes at different temperatures simultaneously.\n\n" +
+              "2. **[Stainless Steel Fire Bowl](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-fire-bowl)** ($84.99) - Improves airflow and makes cleanup easier, extending the life of your ceramic fire box.\n\n" +
+              "3. **[EGG Genius Temperature Controller](https://biggreenegg.com/collections/temperature-control/products/egg-genius-temperature-controller)** ($249.99) - Monitor and adjust your EGG's temperature remotely for perfect results every time.\n\n" +
+              "4. **[Acacia Hardwood Table](https://biggreenegg.com/collections/all-modular-system-tables-stands/products/table-solid-acacia-hardwood-for-xl-egg)** - A beautiful, durable option that provides ample workspace for your EGG.\n\n" +
+              "5. **[Pizza & Baking Stone](https://biggreenegg.com/collections/pizza/products/pizza-baking-stone)** ($69.99) - For perfect pizzas with crispy crusts.\n\n" +
+              "6. **[Stainless Steel Grid](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-grid)** ($41.99) - Durable stainless steel grid provides excellent heat retention.\n\n" +
+              "7. **[Premium Whiskey Barrel Smoking Chips](https://biggreenegg.com/collections/charcoal-wood-starters/products/premium-whiskey-barrel-smoking-chips-2-9-l-180-cu-in)** ($14.99) - Add delicious smoky flavor to your foods.\n\n" +
+              "8. **[Brisket Knife 12\" Stainless Steel](https://biggreenegg.com/products/brisket-knife-12-stainless-steel)** ($29.99) - Perfect for slicing through your smoked meats with precision.\n\n" +
+              "Would you like more specific information about any of these accessories?";
+          } else if (recommendedSize === "Large") {
+            accessoryMessage +=
+              "1. **[5-Piece EGGspander Kit for Large](https://biggreenegg.com/collections/eggspander-system/products/5-piece-eggspander-kit-for-large)** ($329.99) - This versatile system allows you to cook multiple dishes at different temperatures simultaneously.\n\n" +
+              "2. **[Stainless Steel Fire Bowl](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-fire-bowl)** ($84.99) - Improves airflow and makes cleanup easier, extending the life of your ceramic fire box.\n\n" +
+              "3. **[EGG Genius Temperature Controller](https://biggreenegg.com/collections/temperature-control/products/egg-genius-temperature-controller)** ($249.99) - Monitor and adjust your EGG's temperature remotely for perfect results every time.\n\n" +
+              "4. **[Acacia Hardwood Table for Large EGG](https://biggreenegg.com/collections/all-modular-system-tables-stands/products/table-solid-acacia-hardwood-for-large-egg)** ($659.99) - A beautiful, durable option that provides ample workspace.\n\n" +
+              "5. **[Pizza Oven Wedge for Large EGG](https://biggreenegg.com/collections/pizza/products/pizza-oven-wedge-for-large-egg)** ($119.99) - Creates the perfect environment for cooking pizzas with crispy crusts.\n\n" +
+              "6. **[Stainless Steel Grid](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-grid)** ($41.99) - Durable stainless steel grid provides excellent heat retention.\n\n" +
+              "7. **[Premium Whiskey Barrel Smoking Chips](https://biggreenegg.com/collections/charcoal-wood-starters/products/premium-whiskey-barrel-smoking-chips-2-9-l-180-cu-in)** ($14.99) - Add delicious smoky flavor to your foods.\n\n" +
+              "8. **[Brisket Knife 12\" Stainless Steel](https://biggreenegg.com/products/brisket-knife-12-stainless-steel)** ($29.99) - Perfect for slicing through your smoked meats with precision.\n\n" +
+              "Would you like more specific information about any of these accessories?";
+          } else if (recommendedSize === "Medium" || recommendedSize === "Small") {
+            accessoryMessage +=
+              "1. **[Stainless Steel Grid](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-grid)** ($41.99) - Durable stainless steel grid provides excellent heat retention.\n\n" +
+              "2. **[Stainless Steel Fire Bowl](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-fire-bowl)** ($84.99) - Improves airflow and makes cleanup easier, extending the life of your ceramic fire box.\n\n" +
+              "3. **[EGG Genius Temperature Controller](https://biggreenegg.com/collections/temperature-control/products/egg-genius-temperature-controller)** ($249.99) - Monitor and adjust your EGG's temperature remotely for perfect results every time.\n\n" +
+              "4. **[Pizza & Baking Stone](https://biggreenegg.com/collections/pizza/products/pizza-baking-stone)** ($69.99) - For perfect pizzas with crispy crusts.\n\n" +
+              "5. **[Premium Whiskey Barrel Smoking Chips](https://biggreenegg.com/collections/charcoal-wood-starters/products/premium-whiskey-barrel-smoking-chips-2-9-l-180-cu-in)** ($14.99) - Add delicious smoky flavor to your foods.\n\n" +
+              "6. **[Brisket Knife 12\" Stainless Steel](https://biggreenegg.com/products/brisket-knife-12-stainless-steel)** ($29.99) - Perfect for slicing through your smoked meats with precision.\n\n" +
+              "Would you like more specific information about any of these accessories?";
+          } else if (recommendedSize === "MiniMax" || recommendedSize === "Mini") {
+            accessoryMessage +=
+              "1. **[Stainless Steel Grid](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-grid)** ($41.99) - Durable stainless steel grid provides excellent heat retention.\n\n" +
+              "2. **[EGG Carrier](https://biggreenegg.com/collections/all-modular-system-tables-stands)** - Perfect for taking your portable EGG on the go.\n\n" +
+              "3. **[Pizza & Baking Stone](https://biggreenegg.com/collections/pizza/products/pizza-baking-stone)** ($69.99) - For perfect pizzas with crispy crusts, sized to fit your EGG.\n\n" +
+              "4. **[Premium Whiskey Barrel Smoking Chips](https://biggreenegg.com/collections/charcoal-wood-starters/products/premium-whiskey-barrel-smoking-chips-2-9-l-180-cu-in)** ($14.99) - Add delicious smoky flavor to your foods.\n\n" +
+              "5. **[Cast Iron Cooking Grid](https://biggreenegg.com/collections/ceramics-grids)** - For perfect sear marks and excellent heat retention.\n\n" +
+              "6. **[Brisket Knife 12\" Stainless Steel](https://biggreenegg.com/products/brisket-knife-12-stainless-steel)** ($29.99) - Perfect for slicing through your smoked meats with precision.\n\n" +
+              "Would you like more specific information about any of these accessories?";
+          }
 
           return NextResponse.json({
-            messages: [createMessage("assistant", noEggMessage)],
+            messages: [createMessage("assistant", accessoryMessage)],
             category: "product_recommendation",
           });
         }
+
+        // Determine which size EGG they mentioned
+        let eggSize = "Large"; // Default to Large
 
         console.log("Detected EGG size for accessories:", eggSize);
 
@@ -415,27 +490,14 @@ export async function POST(req: NextRequest) {
 
         if (eggSize === "2XL" || eggSize === "XL") {
           accessoryMessage +=
-            "1. **[5-Piece EGGspander Kit](https://biggreenegg.com/collections/eggspander-system/products/5-piece-eggspander-kit-for-xl)** ($349.99) - This versatile system allows you to cook multiple dishes at different temperatures simultaneously.\n\n" +
+            "1. **[5-Piece EGGspander Kit for XL](https://biggreenegg.com/collections/eggspander-system/products/5-piece-eggspander-kit-for-xl)** ($349.99) - This versatile system allows you to cook multiple dishes at different temperatures simultaneously.\n\n" +
             "2. **[Stainless Steel Fire Bowl](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-fire-bowl)** ($84.99) - Improves airflow and makes cleanup easier, extending the life of your ceramic fire box.\n\n" +
             "3. **[EGG Genius Temperature Controller](https://biggreenegg.com/collections/temperature-control/products/egg-genius-temperature-controller)** ($249.99) - Monitor and adjust your EGG's temperature remotely for perfect results every time.\n\n" +
-            "4. **[Acacia Hardwood Table](https://biggreenegg.com/collections/all-modular-system-tables-stands)** - A beautiful, durable option that provides ample workspace for your EGG.\n\n" +
-            "5. **[Pizza & Baking Stone](https://biggreenegg.com/collections/pizza/products/pizza-baking-stone)** ($69.99) - For perfect pizzas with crispy crusts.\n\n";
-
-          // Add pizza-specific accessories if they mentioned pizza
-          if (
-            lowerMessage.includes("pizza") ||
-            (previousMessage.content &&
-              previousMessage.content.toLowerCase().includes("pizza"))
-          ) {
-            accessoryMessage +=
-              "**For pizza specifically, I recommend:**\n\n" +
-              "• **[Pizza & Baking Stone](https://biggreenegg.com/collections/pizza/products/pizza-baking-stone)** ($69.99) - Essential for crispy crusts\n" +
-              "• **[Aluminum Pizza Peel](https://biggreenegg.com/collections/pizza/products/aluminum-pizza-peel)** ($39.99) - Makes transferring pizzas easy\n" +
-              "• **[Compact Pizza Cutter](https://biggreenegg.com/collections/pizza/products/compact-pizza-cutter)** ($19.99) - Perfect for slicing your masterpiece\n" +
-              "• **[Pizza Oven Wedge for XL EGG](https://biggreenegg.com/collections/pizza/products/pizza-oven-wedge-for-xl-egg)** ($119.99) - Creates the perfect pizza oven environment\n\n";
-          }
-
-          accessoryMessage +=
+            "4. **[Acacia Hardwood Table](https://biggreenegg.com/collections/all-modular-system-tables-stands/products/table-solid-acacia-hardwood-for-xl-egg)** - A beautiful, durable option that provides ample workspace for your EGG.\n\n" +
+            "5. **[Pizza & Baking Stone](https://biggreenegg.com/collections/pizza/products/pizza-baking-stone)** ($69.99) - For perfect pizzas with crispy crusts.\n\n" +
+            "6. **[Stainless Steel Grid](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-grid)** ($41.99) - Durable stainless steel grid provides excellent heat retention.\n\n" +
+            "7. **[Premium Whiskey Barrel Smoking Chips](https://biggreenegg.com/collections/charcoal-wood-starters/products/premium-whiskey-barrel-smoking-chips-2-9-l-180-cu-in)** ($14.99) - Add delicious smoky flavor to your foods.\n\n" +
+            "8. **[Brisket Knife 12\" Stainless Steel](https://biggreenegg.com/products/brisket-knife-12-stainless-steel)** ($29.99) - Perfect for slicing through your smoked meats with precision.\n\n" +
             "Would you like more specific information about any of these accessories?";
         } else if (eggSize === "Large") {
           accessoryMessage +=
@@ -443,23 +505,10 @@ export async function POST(req: NextRequest) {
             "2. **[Stainless Steel Fire Bowl](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-fire-bowl)** ($84.99) - Improves airflow and makes cleanup easier, extending the life of your ceramic fire box.\n\n" +
             "3. **[EGG Genius Temperature Controller](https://biggreenegg.com/collections/temperature-control/products/egg-genius-temperature-controller)** ($249.99) - Monitor and adjust your EGG's temperature remotely for perfect results every time.\n\n" +
             "4. **[Acacia Hardwood Table for Large EGG](https://biggreenegg.com/collections/all-modular-system-tables-stands/products/table-solid-acacia-hardwood-for-large-egg)** ($659.99) - A beautiful, durable option that provides ample workspace.\n\n" +
-            "5. **[Pizza Oven Wedge for Large EGG](https://biggreenegg.com/collections/pizza/products/pizza-oven-wedge-for-large-egg)** ($119.99) - Creates the perfect environment for cooking pizzas with crispy crusts.\n\n";
-
-          // Add pizza-specific accessories if they mentioned pizza
-          if (
-            lowerMessage.includes("pizza") ||
-            (previousMessage.content &&
-              previousMessage.content.toLowerCase().includes("pizza"))
-          ) {
-            accessoryMessage +=
-              "**For pizza specifically, I recommend:**\n\n" +
-              "• **[Pizza & Baking Stone](https://biggreenegg.com/collections/pizza/products/pizza-baking-stone)** ($69.99) - Essential for crispy crusts\n" +
-              "• **[Aluminum Pizza Peel](https://biggreenegg.com/collections/pizza/products/aluminum-pizza-peel)** ($39.99) - Makes transferring pizzas easy\n" +
-              "• **[Compact Pizza Cutter](https://biggreenegg.com/collections/pizza/products/compact-pizza-cutter)** ($19.99) - Perfect for slicing your masterpiece\n" +
-              "• **[Pizza Oven Wedge for Large EGG](https://biggreenegg.com/collections/pizza/products/pizza-oven-wedge-for-large-egg)** ($119.99) - Creates the perfect pizza oven environment\n\n";
-          }
-
-          accessoryMessage +=
+            "5. **[Pizza Oven Wedge for Large EGG](https://biggreenegg.com/collections/pizza/products/pizza-oven-wedge-for-large-egg)** ($119.99) - Creates the perfect environment for cooking pizzas with crispy crusts.\n\n" +
+            "6. **[Stainless Steel Grid](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-grid)** ($41.99) - Durable stainless steel grid provides excellent heat retention.\n\n" +
+            "7. **[Premium Whiskey Barrel Smoking Chips](https://biggreenegg.com/collections/charcoal-wood-starters/products/premium-whiskey-barrel-smoking-chips-2-9-l-180-cu-in)** ($14.99) - Add delicious smoky flavor to your foods.\n\n" +
+            "8. **[Brisket Knife 12\" Stainless Steel](https://biggreenegg.com/products/brisket-knife-12-stainless-steel)** ($29.99) - Perfect for slicing through your smoked meats with precision.\n\n" +
             "Would you like more specific information about any of these accessories?";
         } else if (eggSize === "Medium" || eggSize === "Small") {
           accessoryMessage +=
@@ -467,22 +516,8 @@ export async function POST(req: NextRequest) {
             "2. **[Stainless Steel Fire Bowl](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-fire-bowl)** ($84.99) - Improves airflow and makes cleanup easier, extending the life of your ceramic fire box.\n\n" +
             "3. **[EGG Genius Temperature Controller](https://biggreenegg.com/collections/temperature-control/products/egg-genius-temperature-controller)** ($249.99) - Monitor and adjust your EGG's temperature remotely for perfect results every time.\n\n" +
             "4. **[Pizza & Baking Stone](https://biggreenegg.com/collections/pizza/products/pizza-baking-stone)** ($69.99) - For perfect pizzas with crispy crusts.\n\n" +
-            "5. **[Premium Whiskey Barrel Smoking Chips](https://biggreenegg.com/collections/charcoal-wood-starters/products/premium-whiskey-barrel-smoking-chips-2-9-l-180-cu-in)** ($14.99) - Add delicious smoky flavor to your foods.\n\n";
-
-          // Add pizza-specific accessories if they mentioned pizza
-          if (
-            lowerMessage.includes("pizza") ||
-            (previousMessage.content &&
-              previousMessage.content.toLowerCase().includes("pizza"))
-          ) {
-            accessoryMessage +=
-              "**For pizza specifically, I recommend:**\n\n" +
-              "• **[Pizza & Baking Stone](https://biggreenegg.com/collections/pizza/products/pizza-baking-stone)** ($69.99) - Essential for crispy crusts\n" +
-              "• **[Aluminum Pizza Peel](https://biggreenegg.com/collections/pizza/products/aluminum-pizza-peel)** ($39.99) - Makes transferring pizzas easy\n" +
-              "• **[Compact Pizza Cutter](https://biggreenegg.com/collections/pizza/products/compact-pizza-cutter)** ($19.99) - Perfect for slicing your masterpiece\n\n";
-          }
-
-          accessoryMessage +=
+            "5. **[Premium Whiskey Barrel Smoking Chips](https://biggreenegg.com/collections/charcoal-wood-starters/products/premium-whiskey-barrel-smoking-chips-2-9-l-180-cu-in)** ($14.99) - Add delicious smoky flavor to your foods.\n\n" +
+            "6. **[Brisket Knife 12\" Stainless Steel](https://biggreenegg.com/products/brisket-knife-12-stainless-steel)** ($29.99) - Perfect for slicing through your smoked meats with precision.\n\n" +
             "Would you like more specific information about any of these accessories?";
         } else if (eggSize === "MiniMax" || eggSize === "Mini") {
           accessoryMessage +=
@@ -490,21 +525,8 @@ export async function POST(req: NextRequest) {
             "2. **[EGG Carrier](https://biggreenegg.com/collections/all-modular-system-tables-stands)** - Perfect for taking your portable EGG on the go.\n\n" +
             "3. **[Pizza & Baking Stone](https://biggreenegg.com/collections/pizza/products/pizza-baking-stone)** ($69.99) - For perfect pizzas with crispy crusts, sized to fit your EGG.\n\n" +
             "4. **[Premium Whiskey Barrel Smoking Chips](https://biggreenegg.com/collections/charcoal-wood-starters/products/premium-whiskey-barrel-smoking-chips-2-9-l-180-cu-in)** ($14.99) - Add delicious smoky flavor to your foods.\n\n" +
-            "5. **[Cast Iron Cooking Grid](https://biggreenegg.com/collections/ceramics-grids)** - For perfect sear marks and excellent heat retention.\n\n";
-
-          // Add pizza-specific accessories if they mentioned pizza
-          if (
-            lowerMessage.includes("pizza") ||
-            (previousMessage.content &&
-              previousMessage.content.toLowerCase().includes("pizza"))
-          ) {
-            accessoryMessage +=
-              "**For pizza specifically, I recommend:**\n\n" +
-              "• **[Pizza & Baking Stone](https://biggreenegg.com/collections/pizza/products/pizza-baking-stone)** ($69.99) - Essential for crispy crusts, available in a size that fits your Mini/MiniMax\n" +
-              "• **[Compact Pizza Cutter](https://biggreenegg.com/collections/pizza/products/compact-pizza-cutter)** ($19.99) - Perfect for slicing your masterpiece\n\n";
-          }
-
-          accessoryMessage +=
+            "5. **[Cast Iron Cooking Grid](https://biggreenegg.com/collections/ceramics-grids)** - For perfect sear marks and excellent heat retention.\n\n" +
+            "6. **[Brisket Knife 12\" Stainless Steel](https://biggreenegg.com/products/brisket-knife-12-stainless-steel)** ($29.99) - Perfect for slicing through your smoked meats with precision.\n\n" +
             "Would you like more specific information about any of these accessories?";
         }
 
@@ -539,26 +561,67 @@ export async function POST(req: NextRequest) {
           lowerMessage.includes("show me accessories") ||
           lowerMessage.includes("what accessories") ||
           lowerMessage.includes("need accessories") ||
-          lowerMessage.includes("looking for accessories")
+          lowerMessage.includes("looking for accessories") ||
+          lowerMessage === "yes"
         ) {
           console.log(
             "User is asking for accessories instead of answering size questions"
           );
 
-          // Ask which size EGG they have or are interested in
-          const accessoryInquiryMessage =
-            "I'd be happy to recommend accessories for your Big Green Egg! To provide the most appropriate recommendations, could you tell me which size EGG you have or are interested in?\n\n" +
-            "• Mini\n" +
-            "• MiniMax\n" +
-            "• Small\n" +
-            "• Medium\n" +
-            "• Large\n" +
-            "• XL\n" +
-            "• 2XL\n\n" +
-            "If you're not sure which size would be best for you, I can help you determine that first based on your cooking needs.";
+          // Get the recommended size from the previous recommendation
+          let recommendedSize = "Large"; // Default to Large
+          const sizeRecommendation = recommendEggSize(lastMessage.content);
+          if (sizeRecommendation) {
+            recommendedSize = sizeRecommendation.size.split(" ")[0]; // Get just the size part (e.g., "Large" from "Large Big Green Egg")
+          }
+
+          // Generate accessory recommendations based on the recommended size
+          let accessoryMessage = `Here are some essential accessories that work perfectly with your ${recommendedSize} Big Green Egg:\n\n`;
+
+          if (recommendedSize === "2XL" || recommendedSize === "XL") {
+            accessoryMessage +=
+              "1. **[5-Piece EGGspander Kit for XL](https://biggreenegg.com/collections/eggspander-system/products/5-piece-eggspander-kit-for-xl)** ($349.99) - This versatile system allows you to cook multiple dishes at different temperatures simultaneously.\n\n" +
+              "2. **[Stainless Steel Fire Bowl](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-fire-bowl)** ($84.99) - Improves airflow and makes cleanup easier, extending the life of your ceramic fire box.\n\n" +
+              "3. **[EGG Genius Temperature Controller](https://biggreenegg.com/collections/temperature-control/products/egg-genius-temperature-controller)** ($249.99) - Monitor and adjust your EGG's temperature remotely for perfect results every time.\n\n" +
+              "4. **[Acacia Hardwood Table](https://biggreenegg.com/collections/all-modular-system-tables-stands/products/table-solid-acacia-hardwood-for-xl-egg)** - A beautiful, durable option that provides ample workspace for your EGG.\n\n" +
+              "5. **[Pizza & Baking Stone](https://biggreenegg.com/collections/pizza/products/pizza-baking-stone)** ($69.99) - For perfect pizzas with crispy crusts.\n\n" +
+              "6. **[Stainless Steel Grid](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-grid)** ($41.99) - Durable stainless steel grid provides excellent heat retention.\n\n" +
+              "7. **[Premium Whiskey Barrel Smoking Chips](https://biggreenegg.com/collections/charcoal-wood-starters/products/premium-whiskey-barrel-smoking-chips-2-9-l-180-cu-in)** ($14.99) - Add delicious smoky flavor to your foods.\n\n" +
+              "8. **[Brisket Knife 12\" Stainless Steel](https://biggreenegg.com/products/brisket-knife-12-stainless-steel)** ($29.99) - Perfect for slicing through your smoked meats with precision.\n\n" +
+              "Would you like more specific information about any of these accessories?";
+          } else if (recommendedSize === "Large") {
+            accessoryMessage +=
+              "1. **[5-Piece EGGspander Kit for Large](https://biggreenegg.com/collections/eggspander-system/products/5-piece-eggspander-kit-for-large)** ($329.99) - This versatile system allows you to cook multiple dishes at different temperatures simultaneously.\n\n" +
+              "2. **[Stainless Steel Fire Bowl](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-fire-bowl)** ($84.99) - Improves airflow and makes cleanup easier, extending the life of your ceramic fire box.\n\n" +
+              "3. **[EGG Genius Temperature Controller](https://biggreenegg.com/collections/temperature-control/products/egg-genius-temperature-controller)** ($249.99) - Monitor and adjust your EGG's temperature remotely for perfect results every time.\n\n" +
+              "4. **[Acacia Hardwood Table for Large EGG](https://biggreenegg.com/collections/all-modular-system-tables-stands/products/table-solid-acacia-hardwood-for-large-egg)** ($659.99) - A beautiful, durable option that provides ample workspace.\n\n" +
+              "5. **[Pizza Oven Wedge for Large EGG](https://biggreenegg.com/collections/pizza/products/pizza-oven-wedge-for-large-egg)** ($119.99) - Creates the perfect environment for cooking pizzas with crispy crusts.\n\n" +
+              "6. **[Stainless Steel Grid](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-grid)** ($41.99) - Durable stainless steel grid provides excellent heat retention.\n\n" +
+              "7. **[Premium Whiskey Barrel Smoking Chips](https://biggreenegg.com/collections/charcoal-wood-starters/products/premium-whiskey-barrel-smoking-chips-2-9-l-180-cu-in)** ($14.99) - Add delicious smoky flavor to your foods.\n\n" +
+              "8. **[Brisket Knife 12\" Stainless Steel](https://biggreenegg.com/products/brisket-knife-12-stainless-steel)** ($29.99) - Perfect for slicing through your smoked meats with precision.\n\n" +
+              "Would you like more specific information about any of these accessories?";
+          } else if (recommendedSize === "Medium" || recommendedSize === "Small") {
+            accessoryMessage +=
+              "1. **[Stainless Steel Grid](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-grid)** ($41.99) - Durable stainless steel grid provides excellent heat retention.\n\n" +
+              "2. **[Stainless Steel Fire Bowl](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-fire-bowl)** ($84.99) - Improves airflow and makes cleanup easier, extending the life of your ceramic fire box.\n\n" +
+              "3. **[EGG Genius Temperature Controller](https://biggreenegg.com/collections/temperature-control/products/egg-genius-temperature-controller)** ($249.99) - Monitor and adjust your EGG's temperature remotely for perfect results every time.\n\n" +
+              "4. **[Pizza & Baking Stone](https://biggreenegg.com/collections/pizza/products/pizza-baking-stone)** ($69.99) - For perfect pizzas with crispy crusts.\n\n" +
+              "5. **[Premium Whiskey Barrel Smoking Chips](https://biggreenegg.com/collections/charcoal-wood-starters/products/premium-whiskey-barrel-smoking-chips-2-9-l-180-cu-in)** ($14.99) - Add delicious smoky flavor to your foods.\n\n" +
+              "6. **[Brisket Knife 12\" Stainless Steel](https://biggreenegg.com/products/brisket-knife-12-stainless-steel)** ($29.99) - Perfect for slicing through your smoked meats with precision.\n\n" +
+              "Would you like more specific information about any of these accessories?";
+          } else if (recommendedSize === "MiniMax" || recommendedSize === "Mini") {
+            accessoryMessage +=
+              "1. **[Stainless Steel Grid](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-grid)** ($41.99) - Durable stainless steel grid provides excellent heat retention.\n\n" +
+              "2. **[EGG Carrier](https://biggreenegg.com/collections/all-modular-system-tables-stands)** - Perfect for taking your portable EGG on the go.\n\n" +
+              "3. **[Pizza & Baking Stone](https://biggreenegg.com/collections/pizza/products/pizza-baking-stone)** ($69.99) - For perfect pizzas with crispy crusts, sized to fit your EGG.\n\n" +
+              "4. **[Premium Whiskey Barrel Smoking Chips](https://biggreenegg.com/collections/charcoal-wood-starters/products/premium-whiskey-barrel-smoking-chips-2-9-l-180-cu-in)** ($14.99) - Add delicious smoky flavor to your foods.\n\n" +
+              "5. **[Cast Iron Cooking Grid](https://biggreenegg.com/collections/ceramics-grids)** - For perfect sear marks and excellent heat retention.\n\n" +
+              "6. **[Brisket Knife 12\" Stainless Steel](https://biggreenegg.com/products/brisket-knife-12-stainless-steel)** ($29.99) - Perfect for slicing through your smoked meats with precision.\n\n" +
+              "Would you like more specific information about any of these accessories?";
+          }
 
           return NextResponse.json({
-            messages: [createMessage("assistant", accessoryInquiryMessage)],
+            messages: [createMessage("assistant", accessoryMessage)],
             category: "product_recommendation",
           });
         }
@@ -569,88 +632,20 @@ export async function POST(req: NextRequest) {
         // Log the user's response for debugging
         console.log("User response to size question:", lastMessage.content);
 
-        // Check for number of people mentioned - ALWAYS recommend XL for 6+ people
-        if (
-          lastMessage.content.toLowerCase().match(/\b[6-9]\b/) ||
-          lastMessage.content.toLowerCase().includes("six") ||
-          lastMessage.content.toLowerCase().includes("seven") ||
-          lastMessage.content.toLowerCase().includes("eight") ||
-          lastMessage.content.toLowerCase().includes("nine") ||
-          lastMessage.content.toLowerCase().includes("ten") ||
-          lastMessage.content.toLowerCase().includes("6 people") ||
-          lastMessage.content.toLowerCase().includes("7 people") ||
-          lastMessage.content.toLowerCase().includes("8 people") ||
-          lastMessage.content.toLowerCase().includes("9 people") ||
-          lastMessage.content.toLowerCase().includes("10 people") ||
-          lastMessage.content.toLowerCase().includes("for 6") ||
-          lastMessage.content.toLowerCase().includes("for 7") ||
-          lastMessage.content.toLowerCase().includes("for 8") ||
-          lastMessage.content.toLowerCase().includes("for 9") ||
-          lastMessage.content.toLowerCase().includes("for 10") ||
-          lastMessage.content.toLowerCase().includes("for six") ||
-          lastMessage.content.toLowerCase().includes("for seven") ||
-          lastMessage.content.toLowerCase().includes("for eight") ||
-          lastMessage.content.toLowerCase().includes("for nine") ||
-          lastMessage.content.toLowerCase().includes("for ten") ||
-          lastMessage.content.toLowerCase().includes("large family") ||
-          lastMessage.content.toLowerCase().includes("big family") ||
-          lastMessage.content.toLowerCase().includes("many people") ||
-          lastMessage.content.toLowerCase().includes("lots of people")
-        ) {
-          // If they mentioned cooking for 6+ people, they should get an XL recommendation
-          recommendationKey = "LARGE-FAMILY";
-          console.log("Recommending XL EGG for 6+ people");
-        } else if (
-          lastMessage.content.toLowerCase().includes("4 people") ||
-          lastMessage.content.toLowerCase().includes("four people") ||
-          lastMessage.content.toLowerCase().includes("for 4") ||
-          lastMessage.content.toLowerCase().includes("for four") ||
-          lastMessage.content.toLowerCase().includes("4") ||
-          lastMessage.content.toLowerCase().includes("four")
-        ) {
-          // Recommend Large EGG for 4 people
-          recommendationKey = "AVERAGE-FAMILY";
-        } else if (
-          lastMessage.content.toLowerCase().includes("2 people") ||
-          lastMessage.content.toLowerCase().includes("two people") ||
-          lastMessage.content.toLowerCase().includes("for 2") ||
-          lastMessage.content.toLowerCase().includes("for two") ||
-          lastMessage.content.toLowerCase().includes("couple") ||
-          lastMessage.content.toLowerCase().includes("2") ||
-          lastMessage.content.toLowerCase().includes("two")
-        ) {
-          // Recommend Small or Medium EGG for 2 people
-          recommendationKey = "SMALL-FAMILY";
-        } else if (
-          lastMessage.content.toLowerCase().includes("1 person") ||
-          lastMessage.content.toLowerCase().includes("one person") ||
-          lastMessage.content.toLowerCase().includes("just me") ||
-          lastMessage.content.toLowerCase().includes("myself") ||
-          lastMessage.content.toLowerCase().includes("1") ||
-          lastMessage.content.toLowerCase().includes("one")
-        ) {
-          // Recommend Mini or MiniMax EGG for 1 person
-          recommendationKey = "SINGLE-PERSON";
-        }
-
-        // Check for outdoor space mention
-        if (
-          lastMessage.content.toLowerCase().includes("lot of outdoor space") ||
-          lastMessage.content.toLowerCase().includes("large outdoor space") ||
-          lastMessage.content.toLowerCase().includes("big outdoor space") ||
-          lastMessage.content.toLowerCase().includes("plenty of space") ||
-          lastMessage.content.toLowerCase().includes("large backyard") ||
-          lastMessage.content.toLowerCase().includes("big backyard") ||
-          (lastMessage.content.toLowerCase().includes("lot") &&
-            lastMessage.content.toLowerCase().includes("space"))
-        ) {
-          // If they mention having a lot of space and many people, recommend XL or 2XL
-          if (recommendationKey === "LARGE-FAMILY") {
+        // Use the recommendEggSize function to get the proper recommendation
+        const sizeRecommendation = recommendEggSize(lastMessage.content);
+        if (sizeRecommendation) {
+          // Map the recommendation to the correct key
+          if (sizeRecommendation.size.includes("2XL")) {
             recommendationKey = "COMMERCIAL";
-          }
-          // If they have a lot of space but average family, recommend XL
-          else if (recommendationKey === "AVERAGE-FAMILY") {
+          } else if (sizeRecommendation.size.includes("XL")) {
             recommendationKey = "LARGE-FAMILY";
+          } else if (sizeRecommendation.size.includes("Large")) {
+            recommendationKey = "AVERAGE-FAMILY";
+          } else if (sizeRecommendation.size.includes("Medium") || sizeRecommendation.size.includes("Small")) {
+            recommendationKey = "SMALL-FAMILY";
+          } else if (sizeRecommendation.size.includes("Mini")) {
+            recommendationKey = "SINGLE-PERSON";
           }
         }
 
@@ -707,9 +702,111 @@ export async function POST(req: NextRequest) {
         lowerMessage.includes("fire bowl") ||
         lowerMessage.includes("firebowl") ||
         lowerMessage.includes("temperature controller") ||
-        lowerMessage.includes("egg genius")
+        lowerMessage.includes("egg genius") ||
+        // Check if this is a "yes" response to the accessories question
+        (lowerMessage === "yes" || 
+         lowerMessage === "yes i want accessories" || 
+         lowerMessage === "yes please" || 
+         lowerMessage === "sure" || 
+         lowerMessage === "yeah" || 
+         lowerMessage === "y" || 
+         lowerMessage === "ok" || 
+         lowerMessage === "okay" || 
+         (lowerMessage.includes("yes") && lowerMessage.includes("accessories"))) &&
+        messages.length >= 2 && 
+        messages[messages.length - 2].role === "assistant" && 
+        messages[messages.length - 2].content && 
+        messages[messages.length - 2].content.includes("Would you like to see some accessories that work well with this size?")
       ) {
         console.log("User is asking specifically about accessories");
+
+        // Check if we previously recommended an egg size
+        let recommendedSize = null;
+        for (let i = messages.length - 2; i >= 0; i--) {
+          const msg = messages[i];
+          if (msg.role === "assistant" && msg.content) {
+            if (msg.content.includes("Based on your needs, I recommend the")) {
+              // Extract the recommended size
+              if (msg.content.includes("2XL Big Green Egg")) {
+                recommendedSize = "2XL";
+                break;
+              } else if (msg.content.includes("XL Big Green Egg")) {
+                recommendedSize = "XL";
+                break;
+              } else if (msg.content.includes("Large Big Green Egg")) {
+                recommendedSize = "Large";
+                break;
+              } else if (msg.content.includes("Medium Big Green Egg")) {
+                recommendedSize = "Medium";
+                break;
+              } else if (msg.content.includes("Small Big Green Egg")) {
+                recommendedSize = "Small";
+                break;
+              } else if (msg.content.includes("MiniMax Big Green Egg")) {
+                recommendedSize = "MiniMax";
+                break;
+              } else if (msg.content.includes("Mini Big Green Egg")) {
+                recommendedSize = "Mini";
+                break;
+              }
+            }
+          }
+        }
+
+        // If we found a previously recommended size, use it
+        if (recommendedSize) {
+          console.log("Found previously recommended size:", recommendedSize);
+          
+          // Generate accessory recommendations based on the recommended size
+          let accessoryMessage = `Here are some essential accessories that work perfectly with your ${recommendedSize} Big Green Egg:\n\n`;
+
+          if (recommendedSize === "2XL" || recommendedSize === "XL") {
+            accessoryMessage +=
+              "1. **[5-Piece EGGspander Kit for XL](https://biggreenegg.com/collections/eggspander-system/products/5-piece-eggspander-kit-for-xl)** ($349.99) - This versatile system allows you to cook multiple dishes at different temperatures simultaneously.\n\n" +
+              "2. **[Stainless Steel Fire Bowl](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-fire-bowl)** ($84.99) - Improves airflow and makes cleanup easier, extending the life of your ceramic fire box.\n\n" +
+              "3. **[EGG Genius Temperature Controller](https://biggreenegg.com/collections/temperature-control/products/egg-genius-temperature-controller)** ($249.99) - Monitor and adjust your EGG's temperature remotely for perfect results every time.\n\n" +
+              "4. **[Acacia Hardwood Table](https://biggreenegg.com/collections/all-modular-system-tables-stands/products/table-solid-acacia-hardwood-for-xl-egg)** - A beautiful, durable option that provides ample workspace for your EGG.\n\n" +
+              "5. **[Pizza & Baking Stone](https://biggreenegg.com/collections/pizza/products/pizza-baking-stone)** ($69.99) - For perfect pizzas with crispy crusts.\n\n" +
+              "6. **[Stainless Steel Grid](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-grid)** ($41.99) - Durable stainless steel grid provides excellent heat retention.\n\n" +
+              "7. **[Premium Whiskey Barrel Smoking Chips](https://biggreenegg.com/collections/charcoal-wood-starters/products/premium-whiskey-barrel-smoking-chips-2-9-l-180-cu-in)** ($14.99) - Add delicious smoky flavor to your foods.\n\n" +
+              "8. **[Brisket Knife 12\" Stainless Steel](https://biggreenegg.com/products/brisket-knife-12-stainless-steel)** ($29.99) - Perfect for slicing through your smoked meats with precision.\n\n" +
+              "Would you like more specific information about any of these accessories?";
+          } else if (recommendedSize === "Large") {
+            accessoryMessage +=
+              "1. **[5-Piece EGGspander Kit for Large](https://biggreenegg.com/collections/eggspander-system/products/5-piece-eggspander-kit-for-large)** ($329.99) - This versatile system allows you to cook multiple dishes at different temperatures simultaneously.\n\n" +
+              "2. **[Stainless Steel Fire Bowl](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-fire-bowl)** ($84.99) - Improves airflow and makes cleanup easier, extending the life of your ceramic fire box.\n\n" +
+              "3. **[EGG Genius Temperature Controller](https://biggreenegg.com/collections/temperature-control/products/egg-genius-temperature-controller)** ($249.99) - Monitor and adjust your EGG's temperature remotely for perfect results every time.\n\n" +
+              "4. **[Acacia Hardwood Table for Large EGG](https://biggreenegg.com/collections/all-modular-system-tables-stands/products/table-solid-acacia-hardwood-for-large-egg)** ($659.99) - A beautiful, durable option that provides ample workspace.\n\n" +
+              "5. **[Pizza Oven Wedge for Large EGG](https://biggreenegg.com/collections/pizza/products/pizza-oven-wedge-for-large-egg)** ($119.99) - Creates the perfect environment for cooking pizzas with crispy crusts.\n\n" +
+              "6. **[Stainless Steel Grid](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-grid)** ($41.99) - Durable stainless steel grid provides excellent heat retention.\n\n" +
+              "7. **[Premium Whiskey Barrel Smoking Chips](https://biggreenegg.com/collections/charcoal-wood-starters/products/premium-whiskey-barrel-smoking-chips-2-9-l-180-cu-in)** ($14.99) - Add delicious smoky flavor to your foods.\n\n" +
+              "8. **[Brisket Knife 12\" Stainless Steel](https://biggreenegg.com/products/brisket-knife-12-stainless-steel)** ($29.99) - Perfect for slicing through your smoked meats with precision.\n\n" +
+              "Would you like more specific information about any of these accessories?";
+          } else if (recommendedSize === "Medium" || recommendedSize === "Small") {
+            accessoryMessage +=
+              "1. **[Stainless Steel Grid](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-grid)** ($41.99) - Durable stainless steel grid provides excellent heat retention.\n\n" +
+              "2. **[Stainless Steel Fire Bowl](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-fire-bowl)** ($84.99) - Improves airflow and makes cleanup easier, extending the life of your ceramic fire box.\n\n" +
+              "3. **[EGG Genius Temperature Controller](https://biggreenegg.com/collections/temperature-control/products/egg-genius-temperature-controller)** ($249.99) - Monitor and adjust your EGG's temperature remotely for perfect results every time.\n\n" +
+              "4. **[Pizza & Baking Stone](https://biggreenegg.com/collections/pizza/products/pizza-baking-stone)** ($69.99) - For perfect pizzas with crispy crusts.\n\n" +
+              "5. **[Premium Whiskey Barrel Smoking Chips](https://biggreenegg.com/collections/charcoal-wood-starters/products/premium-whiskey-barrel-smoking-chips-2-9-l-180-cu-in)** ($14.99) - Add delicious smoky flavor to your foods.\n\n" +
+              "6. **[Brisket Knife 12\" Stainless Steel](https://biggreenegg.com/products/brisket-knife-12-stainless-steel)** ($29.99) - Perfect for slicing through your smoked meats with precision.\n\n" +
+              "Would you like more specific information about any of these accessories?";
+          } else if (recommendedSize === "MiniMax" || recommendedSize === "Mini") {
+            accessoryMessage +=
+              "1. **[Stainless Steel Grid](https://biggreenegg.com/collections/ceramics-grids/products/stainless-steel-grid)** ($41.99) - Durable stainless steel grid provides excellent heat retention.\n\n" +
+              "2. **[EGG Carrier](https://biggreenegg.com/collections/all-modular-system-tables-stands)** - Perfect for taking your portable EGG on the go.\n\n" +
+              "3. **[Pizza & Baking Stone](https://biggreenegg.com/collections/pizza/products/pizza-baking-stone)** ($69.99) - For perfect pizzas with crispy crusts, sized to fit your EGG.\n\n" +
+              "4. **[Premium Whiskey Barrel Smoking Chips](https://biggreenegg.com/collections/charcoal-wood-starters/products/premium-whiskey-barrel-smoking-chips-2-9-l-180-cu-in)** ($14.99) - Add delicious smoky flavor to your foods.\n\n" +
+              "5. **[Cast Iron Cooking Grid](https://biggreenegg.com/collections/ceramics-grids)** - For perfect sear marks and excellent heat retention.\n\n" +
+              "6. **[Brisket Knife 12\" Stainless Steel](https://biggreenegg.com/products/brisket-knife-12-stainless-steel)** ($29.99) - Perfect for slicing through your smoked meats with precision.\n\n" +
+              "Would you like more specific information about any of these accessories?";
+          }
+
+          return NextResponse.json({
+            messages: [createMessage("assistant", accessoryMessage)],
+            category: "product_recommendation",
+          });
+        }
 
         // Ask which size EGG they have to provide appropriate accessories
         const accessoryInquiryMessage =
@@ -744,9 +841,9 @@ export async function POST(req: NextRequest) {
           // Customize the initial product recommendation prompt
           responseMessage =
             "To help you find the perfect Big Green Egg size or accessories, could you tell me:\n\n" +
-            "• How many people do you typically cook for?\n" +
-            "• Do you entertain frequently?\n" +
-            "• How much outdoor space do you have?\n" +
+            "• How many people do you typically cook for?\n\n" +
+            "• Do you entertain frequently?\n\n" +
+            "• How much outdoor space do you have?\n\n" +
             "• Do you need portability (for camping, tailgating, etc.)?\n\n" +
             "If you're looking for accessories instead, please let me know which size EGG you have, and I can recommend the perfect accessories for your needs.";
         } else {
@@ -946,14 +1043,15 @@ export async function POST(req: NextRequest) {
       if (lowerMessage === "i want to browse your products") {
         productMessage =
           "You can browse all our products on the [Big Green Egg website](https://biggreenegg.com/collections). Here are some popular categories:\n\n" +
-          "• [EGGs by Size](https://biggreenegg.com/collections/all-eggs-egg-packages)\n" +
-          "• [Modular Systems, Tables & Stands](https://biggreenegg.com/collections/all-modular-system-tables-stands)\n" +
-          "• [Accessories](https://biggreenegg.com/collections/accessories)\n" +
-          "• [Cookware & Tools](https://biggreenegg.com/collections/cookware-tools)\n" +
-          "• [Lifestyle & Gear](https://biggreenegg.com/collections/all-lifestyle-gear-1)\n" +
-          "• [Spices & Sauces](https://biggreenegg.com/collections/spices-sauces)\n" +
-          "• [Covers & Cleaning](https://biggreenegg.com/collections/covers-cleaning)\n" +
+          "• [Egg Packages](https://biggreenegg.com/collections/all-eggs-egg-packages)\n\n" +
+          "• [Modular Systems, Tables & Stands](https://biggreenegg.com/collections/all-modular-system-tables-stands)\n\n" +
+          "• [Accessories](https://biggreenegg.com/collections/accessories)\n\n" +
+          "• [Cookware & Tools](https://biggreenegg.com/collections/cookware-tools)\n\n" +
+          "• [Lifestyle & Gear](https://biggreenegg.com/collections/all-lifestyle-gear-1)\n\n" +
+          "• [Spices & Sauces](https://biggreenegg.com/collections/spices-sauces)\n\n" +
+          "• [Covers & Cleaning](https://biggreenegg.com/collections/covers-cleaning)\n\n" +
           "• [Charcoal, Woods & Starters](https://biggreenegg.com/collections/charcoal-wood-starters)\n\n" +
+          "• [Replacement Parts](https://biggreenegg.com/collections/replacement-parts)\n\n" +
           "Let me know if you're looking for something specific!";
 
         return NextResponse.json({
@@ -1281,14 +1379,15 @@ export async function POST(req: NextRequest) {
         ) {
           productMessage =
             "You can browse all our products on the [Big Green Egg website](https://biggreenegg.com/collections). Here are some popular categories:\n\n" +
-            "• [EGGs by Size](https://biggreenegg.com/collections/all-eggs-egg-packages)\n" +
-            "• [Modular Systems, Tables & Stands](https://biggreenegg.com/collections/all-modular-system-tables-stands)\n" +
-            "• [Accessories](https://biggreenegg.com/collections/accessories)\n" +
-            "• [Cookware & Tools](https://biggreenegg.com/collections/cookware-tools)\n" +
-            "• [Lifestyle & Gear](https://biggreenegg.com/collections/all-lifestyle-gear-1)\n" +
-            "• [Spices & Sauces](https://biggreenegg.com/collections/spices-sauces)\n" +
-            "• [Covers & Cleaning](https://biggreenegg.com/collections/covers-cleaning)\n" +
+            "• [Egg Packages](https://biggreenegg.com/collections/all-eggs-egg-packages)\n\n" +
+            "• [Modular Systems, Tables & Stands](https://biggreenegg.com/collections/all-modular-system-tables-stands)\n\n" +
+            "• [Accessories](https://biggreenegg.com/collections/accessories)\n\n" +
+            "• [Cookware & Tools](https://biggreenegg.com/collections/cookware-tools)\n\n" +
+            "• [Lifestyle & Gear](https://biggreenegg.com/collections/all-lifestyle-gear-1)\n\n" +
+            "• [Spices & Sauces](https://biggreenegg.com/collections/spices-sauces)\n\n" +
+            "• [Covers & Cleaning](https://biggreenegg.com/collections/covers-cleaning)\n\n" +
             "• [Charcoal, Woods & Starters](https://biggreenegg.com/collections/charcoal-wood-starters)\n\n" +
+            "• [Replacement Parts](https://biggreenegg.com/collections/replacement-parts)\n\n" +
             "Let me know if you're looking for something specific!";
           isProductInquiry = true;
         }
@@ -1414,6 +1513,125 @@ export async function POST(req: NextRequest) {
       })),
     ];
 
+    // Pre-check for weight and specification queries to ensure they go to product search
+    const queryLowerMessage = lastMessage.content.toLowerCase();
+    const isWeightOrSpecQuery = (
+      (queryLowerMessage.includes("weight") || 
+       queryLowerMessage.includes("weigh") || 
+       queryLowerMessage.includes("how heavy") || 
+       queryLowerMessage.includes("how much does") || 
+       queryLowerMessage.includes("pounds") || 
+       queryLowerMessage.includes("lbs") ||
+       queryLowerMessage.includes("specifications") ||
+       queryLowerMessage.includes("specs") ||
+       queryLowerMessage.includes("dimensions") ||
+       queryLowerMessage.includes("cooking area") ||
+       queryLowerMessage.includes("size of") ||
+       (queryLowerMessage.includes("how big") && queryLowerMessage.includes("egg"))) && 
+      (queryLowerMessage.includes("egg") || containsEggSize(queryLowerMessage))
+    );
+
+    // For weight and spec queries, directly check product search first
+    if (isWeightOrSpecQuery) {
+      console.log("Detected weight/specification query:", lastMessage.content);
+      console.log("Terms detected:");
+      
+      if (queryLowerMessage.includes("weight")) console.log("- 'weight' found");
+      if (queryLowerMessage.includes("weigh")) console.log("- 'weigh' found");
+      if (queryLowerMessage.includes("how heavy")) console.log("- 'how heavy' found");
+      if (queryLowerMessage.includes("how much does")) console.log("- 'how much does' found");
+      if (queryLowerMessage.includes("pounds") || queryLowerMessage.includes("lbs")) console.log("- weight units found");
+      if (queryLowerMessage.includes("egg")) console.log("- 'egg' found");
+      if (containsEggSize(queryLowerMessage)) console.log("- egg size found");
+      
+      // Search for matching products
+      const matchingProducts = searchProducts(lastMessage.content, 10); // Increase max results for better matching
+      console.log(`Search returned ${matchingProducts.length} products for weight/spec query`);
+      
+      // If we found matches, generate a response
+      if (matchingProducts.length > 0) {
+        console.log("Matching products:", matchingProducts.map(p => p.id));
+        const productResponse = generateProductResponse(matchingProducts);
+        
+        return NextResponse.json({
+          messages: [createMessage("assistant", productResponse)],
+          category: "product",
+        });
+      }
+      
+      // If no matches, continue to standard flow
+      console.log("No product matches found for weight/spec query, continuing to standard flow");
+    }
+
+    // Standard query processing order
+    // Check for FAQ queries
+    if (isFAQQuery(lastMessage.content)) {
+      console.log("Detected FAQ query:", lastMessage.content);
+      
+      // Search for matching FAQs
+      const matchingFAQs = searchFAQs(lastMessage.content);
+      
+      // If we found matches, generate a response
+      if (matchingFAQs.length > 0) {
+        const faqResponse = generateFAQResponse(matchingFAQs);
+        
+        return NextResponse.json({
+          messages: [createMessage("assistant", faqResponse)],
+          category: "faq",
+        });
+      }
+      
+      // If no matches, continue to OpenAI
+      console.log("No FAQ matches found, continuing to general response");
+    }
+
+    // Check for product search queries - prioritize this over accessory recommendations
+    if (isProductSearchQuery(lastMessage.content)) {
+      console.log("Detected product search query:", lastMessage.content);
+      
+      // Log if this is a weight or specification query
+      const searchLowerMessage = lastMessage.content.toLowerCase();
+      if (
+        searchLowerMessage.includes("weight") || 
+        searchLowerMessage.includes("heavy") || 
+        searchLowerMessage.includes("how much does") || 
+        searchLowerMessage.includes("pounds") || 
+        searchLowerMessage.includes("lbs") ||
+        searchLowerMessage.includes("specifications") ||
+        searchLowerMessage.includes("specs") ||
+        searchLowerMessage.includes("dimensions")
+      ) {
+        console.log("This appears to be a weight/specification query");
+      }
+      
+      // Check for egg size
+      if (containsEggSize(searchLowerMessage)) {
+        console.log("Query contains egg size reference");
+      }
+      
+      // Search for matching products
+      const matchingProducts = searchProducts(lastMessage.content);
+      
+      console.log(`Search returned ${matchingProducts.length} products`);
+      if (matchingProducts.length > 0) {
+        console.log("Matching products:", matchingProducts.map(p => p.id));
+      }
+      
+      // If we found matches, generate a response
+      if (matchingProducts.length > 0) {
+        console.log(`Found ${matchingProducts.length} matching products`);
+        const productResponse = generateProductResponse(matchingProducts);
+        
+        return NextResponse.json({
+          messages: [createMessage("assistant", productResponse)],
+          category: "product",
+        });
+      }
+      
+      // If no matches, continue to OpenAI
+      console.log("No product matches found, continuing to general response");
+    }
+
     // Call OpenAI API
     const response = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
@@ -1461,6 +1679,24 @@ export async function POST(req: NextRequest) {
 function isProductRecommendation(message: string): boolean {
   const lowerMessage = message.toLowerCase();
 
+  // First check for specific product searches that should be handled by product search
+  // rather than accessory recommendation flow
+  if (
+    lowerMessage.includes("egg genius") ||
+    lowerMessage.includes("temperature controller") ||
+    lowerMessage.includes("pizza stone") ||
+    lowerMessage.includes("pizza oven") ||
+    lowerMessage.includes("eggspander") ||
+    lowerMessage.includes("fire bowl") ||
+    (lowerMessage.includes("buy") && 
+     (lowerMessage.includes("egg genius") || 
+      lowerMessage.includes("pizza stone") || 
+      lowerMessage.includes("eggspander")))
+  ) {
+    // These should be handled by product search instead
+    return false;
+  }
+
   // Check for product recommendation keywords
   return (
     lowerMessage.includes("recommend") ||
@@ -1483,9 +1719,6 @@ function isProductRecommendation(message: string): boolean {
     lowerMessage.includes("help me choose") ||
     lowerMessage.includes("help me find") ||
     // Check for specific product categories
-    lowerMessage.includes("pizza stone") ||
-    lowerMessage.includes("temperature controller") ||
-    lowerMessage.includes("eggspander") ||
     lowerMessage.includes("table") ||
     lowerMessage.includes("stand") ||
     lowerMessage.includes("cover") ||
@@ -1520,4 +1753,167 @@ function isGuidedSelectionQuery(message: string): boolean {
     lowerMessage.includes("guide me") ||
     (lowerMessage.includes("new") && lowerMessage.includes("big green egg"))
   );
+}
+
+// Add this function near the other detection functions (around line 1500)
+function isFAQQuery(message: string): boolean {
+  const lowerMessage = message.toLowerCase();
+  
+  // Skip FAQ classification if this is a weight or specification query
+  if (
+    (lowerMessage.includes("weight") || 
+     lowerMessage.includes("weigh") || 
+     lowerMessage.includes("how heavy") || 
+     lowerMessage.includes("how much does") || 
+     lowerMessage.includes("pounds") || 
+     lowerMessage.includes("lbs") ||
+     lowerMessage.includes("specifications") ||
+     lowerMessage.includes("specs") ||
+     lowerMessage.includes("dimensions") ||
+     lowerMessage.includes("cooking area") ||
+     lowerMessage.includes("size of") ||
+     (lowerMessage.includes("how big") && lowerMessage.includes("egg"))) && 
+    (lowerMessage.includes("egg") || containsEggSize(lowerMessage))
+  ) {
+    console.log("Skipping FAQ classification for weight/specification query");
+    return false;
+  }
+  
+  // Check for question patterns
+  if (
+    lowerMessage.startsWith("what") ||
+    lowerMessage.startsWith("how") ||
+    lowerMessage.startsWith("why") ||
+    lowerMessage.startsWith("can") ||
+    lowerMessage.startsWith("is") ||
+    lowerMessage.startsWith("are") ||
+    lowerMessage.startsWith("do") ||
+    lowerMessage.startsWith("does") ||
+    lowerMessage.includes("?")
+  ) {
+    // Check for ceramic cooker and Big Green Egg related terms
+    return (
+      lowerMessage.includes("ceramic") ||
+      lowerMessage.includes("kamado") ||
+      lowerMessage.includes("egg") ||
+      lowerMessage.includes("bge") ||
+      lowerMessage.includes("big green") ||
+      lowerMessage.includes("cooker") ||
+      lowerMessage.includes("grill") ||
+      lowerMessage.includes("smoker") ||
+      lowerMessage.includes("charcoal") ||
+      lowerMessage.includes("temperature") ||
+      lowerMessage.includes("smoking") ||
+      lowerMessage.includes("cooking") ||
+      lowerMessage.includes("heat") ||
+      lowerMessage.includes("fire") ||
+      lowerMessage.includes("hot") ||
+      lowerMessage.includes("ash") ||
+      lowerMessage.includes("clean")
+    );
+  }
+  
+  return false;
+}
+
+// Helper function to check if message contains any egg size variation
+function containsEggSize(message: string): boolean {
+  const lowerMessage = message.toLowerCase();
+  const eggSizeVariations = [
+    ["2xl", "2-xl", "2 xl", "xxl", "xx-large", "xxlarge", "2x large", "2xlarge", "2-extra large", "2-extra-large", "double extra large"],
+    ["xl", "x-large", "x large", "xlarge", "x-l", "extra large", "extra-large", "extralarge", "xtra large", "xtra-large"],
+    ["large", "lg", "l"],
+    ["medium", "med", "m"],
+    ["small", "sm", "s"],
+    ["minimax", "mini max", "mini-max"],
+    ["mini"]
+  ];
+  
+  for (const variations of eggSizeVariations) {
+    if (variations.some(v => lowerMessage.includes(v))) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+// Add this function near the other detection functions (around line 1500)
+function isProductSearchQuery(message: string): boolean {
+  const lowerMessage = message.toLowerCase();
+  
+  // Check for weight-related queries about eggs
+  if ((lowerMessage.includes("weight") || 
+       lowerMessage.includes("how heavy") || 
+       lowerMessage.includes("how much does") || 
+       lowerMessage.includes("pounds") || 
+       lowerMessage.includes("lbs")) && 
+      (lowerMessage.includes("egg") || containsEggSize(lowerMessage))) {
+    return true;
+  }
+  
+  // First check for specific product mentions that should always trigger product search
+  if (
+    lowerMessage.includes("egg genius") ||
+    lowerMessage.includes("temperature controller") ||
+    lowerMessage.includes("pizza stone") ||
+    lowerMessage.includes("pizza oven") ||
+    lowerMessage.includes("eggspander") ||
+    lowerMessage.includes("fire bowl") ||
+    (lowerMessage.includes("buy") && 
+     (lowerMessage.includes("egg genius") || 
+      lowerMessage.includes("pizza stone") || 
+      lowerMessage.includes("eggspander") ||
+      lowerMessage.includes("specific product")))
+  ) {
+    return true;
+  }
+  
+  // Check for product search patterns
+  const productSearchPatterns = [
+    /where can i (find|buy|get|purchase)/i,
+    /how much (is|does|costs?)/i,
+    /price of/i,
+    /looking for/i,
+    /do you (have|sell|offer)/i,
+    /show me/i,
+    /tell me about/i,
+    /information (on|about)/i,
+    /search for/i,
+    /find me/i,
+    /i need/i,
+    /i want/i,
+    /i'm interested in/i,
+    /can i get/i,
+    // Add patterns for weight and specification queries
+    /how (heavy|much) (is|does|weighs)/i,
+    /weight of/i,
+    /specifications (of|for)/i,
+    /what are the (specs|specifications|dimensions|measurements)/i
+  ];
+  
+  // Check if any product search pattern matches
+  const isSearchPattern = productSearchPatterns.some(pattern => 
+    pattern.test(lowerMessage)
+  );
+  
+  // Check for product category terms
+  const containsProductTerms = [
+    "egg", "grill", "cooker", "kamado", "table", "stand", "nest", 
+    "accessory", "accessories", "cover", "grid", "charcoal", "wood chips",
+    "smoking", "pizza", "stone", "thermometer", "temperature", "controller",
+    "eggspander", "conveggtor", "plate setter", "fire bowl", "firebox",
+    "gasket", "replacement", "part", "parts", "shirt", "apparel", "hoodie",
+    "t-shirt", "tshirt", "package", "modular", "acacia", "hardwood", "insert",
+    "handler", "mates", "shelves", "fire ring", "dome", "base", "ceramic",
+    // Add weight and specification related terms
+    "weight", "heavy", "pounds", "lbs", "kg", "specifications", "specs",
+    "dimensions", "size", "measurements", "cooking area", "capacity"
+  ].some(term => lowerMessage.includes(term));
+  
+  // Return true if it matches a search pattern AND contains product terms
+  // OR if it explicitly mentions "product" or "buy"
+  return (isSearchPattern && containsProductTerms) || 
+         lowerMessage.includes("product") || 
+         lowerMessage.includes("buy");
 }

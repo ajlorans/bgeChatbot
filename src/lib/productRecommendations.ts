@@ -209,6 +209,26 @@ export const products: Record<string, Product> = {
     compatibleWith: ["2XL", "XL", "Large", "Medium", "Small", "MiniMax"],
     relatedProducts: ["APPLE-CHIPS", "HICKORY-CHIPS"],
   },
+  "APPLE-CHIPS": {
+    name: "Apple Smoking Chips",
+    description:
+      "Mild, sweet smoking chips perfect for poultry, pork and fish. Adds delicate fruity flavor to foods.",
+    price: "$14.99",
+    url: "https://biggreenegg.com/collections/charcoal-wood-starters/products/apple-smoking-chips-2-9-l-180-cu-in",
+    category: "smoking",
+    compatibleWith: ["2XL", "XL", "Large", "Medium", "Small", "MiniMax", "Mini"],
+    relatedProducts: ["WHISKEY-CHIPS", "HICKORY-CHIPS"],
+  },
+  "HICKORY-CHIPS": {
+    name: "Hickory Smoking Chips",
+    description:
+      "Classic smoking chips that add rich, savory flavor to foods. Perfect for pork, chicken, beef and cheese.",
+    price: "$14.99",
+    url: "https://biggreenegg.com/collections/charcoal-wood-starters/products/hickory-smoking-chips-2-9-l-180-cu-in",
+    category: "smoking",
+    compatibleWith: ["2XL", "XL", "Large", "Medium", "Small", "MiniMax", "Mini"],
+    relatedProducts: ["WHISKEY-CHIPS", "APPLE-CHIPS"],
+  },
   "BRISKET-KNIFE": {
     name: 'Brisket Knife 12" Stainless Steel',
     description:
@@ -299,7 +319,7 @@ export const eggSizeRecommendations: Record<string, EggSizeRecommendation> = {
     size: "Mini or MiniMax",
     recommendedFor: "Single person or couple, limited space, portability",
     price: "From $489.99",
-    url: "https://biggreenegg.com/collections/all-eggs-egg-packages/products/mini-big-green-egg",
+    url: "https://biggreenegg.com/collections/all-eggs-egg-packages",
     description:
       "The Mini and MiniMax EGGs are perfect for individuals, small spaces like apartments or balconies, and those who want portability for camping or tailgating.",
   },
@@ -307,7 +327,7 @@ export const eggSizeRecommendations: Record<string, EggSizeRecommendation> = {
     size: "Small or Medium",
     recommendedFor: "Small family (2-3 people), limited space",
     price: "From $689.99",
-    url: "https://biggreenegg.com/collections/all-eggs-egg-packages/products/small-big-green-egg",
+    url: "https://biggreenegg.com/collections/all-eggs-egg-packages",
     description:
       "The Small and Medium EGGs are ideal for small families, cooking for 2-3 people, and those with limited outdoor space who still want the full BGE experience.",
   },
@@ -315,7 +335,7 @@ export const eggSizeRecommendations: Record<string, EggSizeRecommendation> = {
     size: "Large",
     recommendedFor: "Average family (3-5 people), most versatile",
     price: "From $1,149.99",
-    url: "https://biggreenegg.com/collections/all-eggs-egg-packages/products/large-big-green-egg",
+    url: "https://biggreenegg.com/collections/all-eggs-egg-packages",
     description:
       "Our most popular size, the Large EGG is perfect for most families. It offers versatility for cooking everything from appetizers to entrees for 3-5 people.",
   },
@@ -323,7 +343,7 @@ export const eggSizeRecommendations: Record<string, EggSizeRecommendation> = {
     size: "XL",
     recommendedFor: "Large family (5-8 people), frequent entertaining",
     price: "From $1,599.99",
-    url: "https://biggreenegg.com/collections/all-eggs-egg-packages/products/xl-big-green-egg",
+    url: "https://biggreenegg.com/collections/all-eggs-egg-packages",
     description:
       "The XL EGG is perfect for larger families and those who entertain frequently. It can cook two 20-pound turkeys at once and is ideal for feeding 5-8 people.",
   },
@@ -331,7 +351,7 @@ export const eggSizeRecommendations: Record<string, EggSizeRecommendation> = {
     size: "2XL",
     recommendedFor: "Very large gatherings, commercial use",
     price: "From $2,649.99",
-    url: "https://biggreenegg.com/collections/all-eggs-egg-packages/products/2xl-big-green-egg",
+    url: "https://biggreenegg.com/collections/all-eggs-egg-packages",
     description:
       "Our largest EGG, the 2XL is perfect for very large gatherings, commercial use, and serious enthusiasts. It can cook up to 20 steaks at once.",
   },
@@ -442,6 +462,57 @@ export function getComplementaryProducts(productId: string): Product[] {
 export function recommendEggSize(query: string): EggSizeRecommendation | null {
   const lowerQuery = query.toLowerCase();
 
+  // Check for specific numbers first
+  if (
+    lowerQuery.match(/\b(1[2-9]|[2-9]\d+)\b/) || // Matches 12 or more
+    lowerQuery.includes("twelve") ||
+    lowerQuery.includes("thirteen") ||
+    lowerQuery.includes("fourteen") ||
+    lowerQuery.includes("fifteen") ||
+    lowerQuery.includes("sixteen") ||
+    lowerQuery.includes("seventeen") ||
+    lowerQuery.includes("eighteen") ||
+    lowerQuery.includes("nineteen") ||
+    lowerQuery.includes("twenty") ||
+    lowerQuery.includes("many people") ||
+    lowerQuery.includes("lots of people") ||
+    lowerQuery.includes("large group") ||
+    lowerQuery.includes("big group")
+  ) {
+    return eggSizeRecommendations["COMMERCIAL"];
+  }
+
+  // Check for 6-11 people
+  if (
+    lowerQuery.match(/\b([6-9]|1[0-1])\b/) || // Matches 6-11
+    lowerQuery.includes("six") ||
+    lowerQuery.includes("seven") ||
+    lowerQuery.includes("eight") ||
+    lowerQuery.includes("nine") ||
+    lowerQuery.includes("ten") ||
+    lowerQuery.includes("eleven") ||
+    lowerQuery.includes("6 people") ||
+    lowerQuery.includes("7 people") ||
+    lowerQuery.includes("8 people") ||
+    lowerQuery.includes("9 people") ||
+    lowerQuery.includes("10 people") ||
+    lowerQuery.includes("11 people") ||
+    lowerQuery.includes("for 6") ||
+    lowerQuery.includes("for 7") ||
+    lowerQuery.includes("for 8") ||
+    lowerQuery.includes("for 9") ||
+    lowerQuery.includes("for 10") ||
+    lowerQuery.includes("for 11") ||
+    lowerQuery.includes("for six") ||
+    lowerQuery.includes("for seven") ||
+    lowerQuery.includes("for eight") ||
+    lowerQuery.includes("for nine") ||
+    lowerQuery.includes("for ten") ||
+    lowerQuery.includes("for eleven")
+  ) {
+    return eggSizeRecommendations["LARGE-FAMILY"];
+  }
+
   if (
     lowerQuery.includes("single") ||
     lowerQuery.includes("just me") ||
@@ -536,16 +607,15 @@ export function generateEggSizeRecommendationMessage(
   if (!recommendation) {
     return (
       "To help you find the perfect Big Green Egg size, could you tell me:\n\n" +
-      "• How many people do you typically cook for?\n\n" +
-      "• Do you entertain frequently?\n\n" +
-      "• How much outdoor space do you have?\n\n" +
+      "• How many people do you typically cook for?\n" +
+      "• How much outdoor space do you have?\n" +
       "• Do you need portability (for camping, tailgating, etc.)?\n\n" +
       "If you're looking for accessories instead, please let me know which size EGG you have, and I can recommend the perfect accessories for your needs."
     );
   }
 
   return (
-    `Based on your needs, I recommend the **${recommendation.size} Big Green Egg** (${recommendation.price}).\n\n` +
+    `Based on your needs, I recommend the **[${recommendation.size} Big Green Egg](${recommendation.url})** (${recommendation.price}).\n\n` +
     `This size is ideal for: ${recommendation.recommendedFor}.\n\n` +
     `${recommendation.description}\n\n` +
     `Would you like to see some accessories that work well with this size?`

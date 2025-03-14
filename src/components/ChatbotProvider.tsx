@@ -25,6 +25,7 @@ interface ChatbotProviderProps {
   initialMessage?: string;
   primaryColor?: string;
   botName?: string;
+  showChatBubble?: boolean;
 }
 
 export const ChatbotProvider: React.FC<ChatbotProviderProps> = ({
@@ -32,6 +33,7 @@ export const ChatbotProvider: React.FC<ChatbotProviderProps> = ({
   initialMessage,
   primaryColor,
   botName,
+  showChatBubble = true,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -48,6 +50,7 @@ export const ChatbotProvider: React.FC<ChatbotProviderProps> = ({
         initialMessage={initialMessage}
         primaryColor={primaryColor}
         botName={botName}
+        showChatBubble={showChatBubble}
       />
     </ChatbotContext.Provider>
   );

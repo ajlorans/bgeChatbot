@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAllowedOrigins, corsConfig } from "@/config/cors";
 
 // Shopify credentials - used in the POST function below
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -108,7 +109,50 @@ async function getShopifyOrder(orderId: string) {
 }
 */
 
+// CORS middleware for the Shopify API
+export async function OPTIONS(req: NextRequest) {
+  const origin = req.headers.get('origin');
+  const allowedOrigins = getAllowedOrigins();
+
+  if (origin && allowedOrigins.includes(origin)) {
+    return new NextResponse(null, {
+      status: 200,
+      headers: {
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Methods': corsConfig.methods.join(', '),
+        'Access-Control-Allow-Headers': corsConfig.allowedHeaders.join(', '),
+        'Access-Control-Max-Age': corsConfig.maxAge.toString(),
+        'Access-Control-Allow-Credentials': 'true'
+      }
+    });
+  }
+
+  return new NextResponse(null, { status: 403 });
+}
+
 export async function POST(req: NextRequest) {
+  const origin = req.headers.get('origin') || '*';
+  const allowedOrigins = getAllowedOrigins();
+
+  // Check if the origin is allowed, but be more permissive
+  const isAllowedOrigin = allowedOrigins.includes('*') || allowedOrigins.includes(origin);
+  if (!isAllowedOrigin) {
+    console.error(`CORS error: Origin ${origin} not allowed`);
+    
+    // Return a proper JSON response with CORS headers for debugging
+    const corsErrorResponse = NextResponse.json({
+      error: "CORS error: Origin not allowed",
+      allowedOrigins,
+      requestOrigin: origin,
+    }, { status: 403 });
+    
+    corsErrorResponse.headers.set('Access-Control-Allow-Origin', '*');
+    corsErrorResponse.headers.set('Access-Control-Allow-Methods', corsConfig.methods.join(', '));
+    corsErrorResponse.headers.set('Access-Control-Allow-Headers', corsConfig.allowedHeaders.join(', '));
+    
+    return corsErrorResponse;
+  }
+
   try {
     const { action, orderId, email, requireBoth } = await req.json();
 
@@ -117,9 +161,17 @@ export async function POST(req: NextRequest) {
     const shopifyAccessToken = process.env.SHOPIFY_ACCESS_TOKEN;
 
     if (!shopifyStoreUrl || !shopifyAccessToken) {
-      return NextResponse.json({
+      const errorResponse = NextResponse.json({
         error: "Shopify credentials not configured",
       });
+      
+      // Always add CORS headers to all responses
+      errorResponse.headers.set('Access-Control-Allow-Origin', origin);
+      errorResponse.headers.set('Access-Control-Allow-Methods', corsConfig.methods.join(', '));
+      errorResponse.headers.set('Access-Control-Allow-Headers', corsConfig.allowedHeaders.join(', '));
+      errorResponse.headers.set('Access-Control-Allow-Credentials', 'true');
+      
+      return errorResponse;
     }
 
     if (action === "getOrderStatus") {
@@ -309,9 +361,17 @@ export async function POST(req: NextRequest) {
 
         if (!response.ok) {
           console.error("Shopify API error:", await response.text());
-          return NextResponse.json({
+          const errorResponse = NextResponse.json({
             error: "Failed to fetch order from Shopify",
           });
+          
+          // Add CORS headers to the error response
+          errorResponse.headers.set('Access-Control-Allow-Origin', origin);
+          errorResponse.headers.set('Access-Control-Allow-Methods', corsConfig.methods.join(', '));
+          errorResponse.headers.set('Access-Control-Allow-Headers', corsConfig.allowedHeaders.join(', '));
+          errorResponse.headers.set('Access-Control-Allow-Credentials', 'true');
+          
+          return errorResponse;
         }
 
         const result = await response.json();
@@ -319,9 +379,17 @@ export async function POST(req: NextRequest) {
         // Check if there are any errors in the GraphQL response
         if (result.errors) {
           console.error("GraphQL errors:", result.errors);
-          return NextResponse.json({
+          const errorResponse = NextResponse.json({
             error: "Failed to fetch order from Shopify",
           });
+          
+          // Add CORS headers to the error response
+          errorResponse.headers.set('Access-Control-Allow-Origin', origin);
+          errorResponse.headers.set('Access-Control-Allow-Methods', corsConfig.methods.join(', '));
+          errorResponse.headers.set('Access-Control-Allow-Headers', corsConfig.allowedHeaders.join(', '));
+          errorResponse.headers.set('Access-Control-Allow-Credentials', 'true');
+          
+          return errorResponse;
         }
 
         // Handle email search results differently
@@ -330,10 +398,18 @@ export async function POST(req: NextRequest) {
             result.data?.customers?.edges[0]?.node?.orders?.edges || [];
 
           if (customerOrders.length === 0) {
-            return NextResponse.json({
+            const errorResponse = NextResponse.json({
               error:
                 "No orders found matching both the email address and order number",
             });
+            
+            // Add CORS headers to the error response
+            errorResponse.headers.set('Access-Control-Allow-Origin', origin);
+            errorResponse.headers.set('Access-Control-Allow-Methods', corsConfig.methods.join(', '));
+            errorResponse.headers.set('Access-Control-Allow-Headers', corsConfig.allowedHeaders.join(', '));
+            errorResponse.headers.set('Access-Control-Allow-Credentials', 'true');
+            
+            return errorResponse;
           }
 
           // For security, we only return a single order when both email and order number are provided
@@ -372,9 +448,17 @@ export async function POST(req: NextRequest) {
               orderData.fulfillments[0].estimatedDeliveryAt;
           }
 
-          return NextResponse.json({
+          // Add CORS headers to the response
+          const orderResponse = NextResponse.json({
             order: transformedOrder,
           });
+
+          orderResponse.headers.set('Access-Control-Allow-Origin', origin);
+          orderResponse.headers.set('Access-Control-Allow-Methods', corsConfig.methods.join(', '));
+          orderResponse.headers.set('Access-Control-Allow-Headers', corsConfig.allowedHeaders.join(', '));
+          orderResponse.headers.set('Access-Control-Allow-Credentials', 'true');
+
+          return orderResponse;
         } else if (email) {
           const customerOrders =
             result.data?.customers?.edges[0]?.node?.orders?.edges || [];
@@ -392,9 +476,17 @@ export async function POST(req: NextRequest) {
               financial_status: edge.node.displayFinancialStatus.toLowerCase(),
             }));
 
-            return NextResponse.json({
+            // Add CORS headers to the response
+            const ordersResponse = NextResponse.json({
               orders: orderList,
             });
+
+            ordersResponse.headers.set('Access-Control-Allow-Origin', origin);
+            ordersResponse.headers.set('Access-Control-Allow-Methods', corsConfig.methods.join(', '));
+            ordersResponse.headers.set('Access-Control-Allow-Headers', corsConfig.allowedHeaders.join(', '));
+            ordersResponse.headers.set('Access-Control-Allow-Credentials', 'true');
+
+            return ordersResponse;
           }
 
           // Single order case
@@ -426,9 +518,17 @@ export async function POST(req: NextRequest) {
               orderData.fulfillments[0].estimatedDeliveryAt;
           }
 
-          return NextResponse.json({
+          // Add CORS headers to the response
+          const singleOrderResponse = NextResponse.json({
             order: transformedOrder,
           });
+
+          singleOrderResponse.headers.set('Access-Control-Allow-Origin', origin);
+          singleOrderResponse.headers.set('Access-Control-Allow-Methods', corsConfig.methods.join(', '));
+          singleOrderResponse.headers.set('Access-Control-Allow-Headers', corsConfig.allowedHeaders.join(', '));
+          singleOrderResponse.headers.set('Access-Control-Allow-Credentials', 'true');
+
+          return singleOrderResponse;
         }
 
         // Handle order number search results
@@ -469,34 +569,74 @@ export async function POST(req: NextRequest) {
             orderData.fulfillments[0].estimatedDeliveryAt;
         }
 
-        return NextResponse.json({
+        // Add CORS headers to the response
+        const finalResponse = NextResponse.json({
           order: transformedOrder,
         });
+
+        finalResponse.headers.set('Access-Control-Allow-Origin', origin);
+        finalResponse.headers.set('Access-Control-Allow-Methods', corsConfig.methods.join(', '));
+        finalResponse.headers.set('Access-Control-Allow-Headers', corsConfig.allowedHeaders.join(', '));
+        finalResponse.headers.set('Access-Control-Allow-Credentials', 'true');
+
+        return finalResponse;
       } catch (error) {
         clearTimeout(timeoutId); // Clear the timeout if there's an error
         console.error("Error fetching from Shopify API:", error);
 
         // Check if it's a timeout error
         if (error instanceof Error && error.name === "AbortError") {
-          return NextResponse.json({
+          const errorResponse = NextResponse.json({
             error: "Request timed out. Please try again later.",
           });
+          
+          // Add CORS headers to the error response
+          errorResponse.headers.set('Access-Control-Allow-Origin', origin);
+          errorResponse.headers.set('Access-Control-Allow-Methods', corsConfig.methods.join(', '));
+          errorResponse.headers.set('Access-Control-Allow-Headers', corsConfig.allowedHeaders.join(', '));
+          errorResponse.headers.set('Access-Control-Allow-Credentials', 'true');
+          
+          return errorResponse;
         }
 
-        return NextResponse.json({
+        const errorResponse = NextResponse.json({
           error: "Failed to fetch order from Shopify",
         });
+        
+        // Add CORS headers to the error response
+        errorResponse.headers.set('Access-Control-Allow-Origin', origin);
+        errorResponse.headers.set('Access-Control-Allow-Methods', corsConfig.methods.join(', '));
+        errorResponse.headers.set('Access-Control-Allow-Headers', corsConfig.allowedHeaders.join(', '));
+        errorResponse.headers.set('Access-Control-Allow-Credentials', 'true');
+        
+        return errorResponse;
       }
     }
 
-    return NextResponse.json({
+    const errorResponse = NextResponse.json({
       error: "Invalid action",
     });
+    
+    // Add CORS headers to the error response
+    errorResponse.headers.set('Access-Control-Allow-Origin', origin);
+    errorResponse.headers.set('Access-Control-Allow-Methods', corsConfig.methods.join(', '));
+    errorResponse.headers.set('Access-Control-Allow-Headers', corsConfig.allowedHeaders.join(', '));
+    errorResponse.headers.set('Access-Control-Allow-Credentials', 'true');
+    
+    return errorResponse;
   } catch (error) {
     console.error("Error in Shopify API:", error);
-    return NextResponse.json({
+    const errorResponse = NextResponse.json({
       error: "Failed to process request",
     });
+    
+    // Add CORS headers to the error response
+    errorResponse.headers.set('Access-Control-Allow-Origin', origin);
+    errorResponse.headers.set('Access-Control-Allow-Methods', corsConfig.methods.join(', '));
+    errorResponse.headers.set('Access-Control-Allow-Headers', corsConfig.allowedHeaders.join(', '));
+    errorResponse.headers.set('Access-Control-Allow-Credentials', 'true');
+    
+    return errorResponse;
   }
 }
 
