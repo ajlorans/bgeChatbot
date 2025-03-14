@@ -24,3 +24,34 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Product Recommendation Styles */
+.product-recommendation-wrapper {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.product-recommendation-wrapper a {
+  color: #006838 !important; /* BGE green */
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.product-recommendation-wrapper a:hover {
+  text-decoration: underline;
+}
+
+/* Ensure text is visible in dark mode */
+.dark .product-recommendation-wrapper {
+  color: #f3f4f6;
+}
+
+/* Add more contrast to the text in both light and dark modes */
+.prose .product-recommendation-wrapper {
+  color: #111827 !important;
+}
+
+.dark .prose .product-recommendation-wrapper {
+  color: #f3f4f6 !important;
+}

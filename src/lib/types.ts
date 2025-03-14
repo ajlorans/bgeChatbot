@@ -5,6 +5,7 @@ export interface Message {
   role: MessageRole;
   content: string;
   timestamp: number;
+  category?: ChatCategory;
 }
 
 export interface ChatSession {

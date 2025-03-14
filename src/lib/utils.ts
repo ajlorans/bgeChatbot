@@ -13,13 +13,15 @@ export function getCurrentTimestamp(): number {
 
 export function createMessage(
   role: "user" | "assistant" | "system",
-  content: string
+  content: string,
+  category?: ChatCategory
 ): Message {
   return {
     id: generateUniqueId(),
     role,
     content,
     timestamp: getCurrentTimestamp(),
+    category,
   };
 }
 

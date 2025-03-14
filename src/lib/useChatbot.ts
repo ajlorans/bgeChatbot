@@ -54,14 +54,27 @@ export function useChatbot({
         }
 
         const data = await response.json();
-        if (Array.isArray(data.messages) && data.messages.length > 0) {
+        if (data.message) {
+          // Handle single message response with category
+          const assistantMessage = createMessage("assistant", data.message);
+          if (data.category) {
+            assistantMessage.category = data.category;
+            setCategory(data.category);
+          }
+          setMessages((prev) => [...prev, assistantMessage]);
+        } else if (Array.isArray(data.messages) && data.messages.length > 0) {
+          // Handle multiple messages response
           setMessages((prev) => [...prev, ...data.messages]);
+
+          // Set category from the last message if available
+          const lastMessage = data.messages[data.messages.length - 1];
+          if (lastMessage.category) {
+            setCategory(lastMessage.category);
+          } else if (data.category) {
+            setCategory(data.category);
+          }
         } else {
           throw new Error("Invalid response format");
-        }
-
-        if (data.category) {
-          setCategory(data.category);
         }
       } catch (error) {
         console.error("Error sending message:", error);

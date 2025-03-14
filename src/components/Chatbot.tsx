@@ -10,6 +10,7 @@ import {
 import ReactMarkdown from "react-markdown";
 import { useChatbot } from "@/lib/useChatbot";
 import { useChatbotContext } from "./ChatbotProvider";
+import { ProductRecommendation } from "@/app/components/ProductRecommendation";
 
 interface ChatbotProps {
   initialMessage?: string;
@@ -237,8 +238,21 @@ const Chatbot: React.FC<ChatbotProps> = ({
     }
   };
 
-  const renderMessage = (content: string) => {
-    // Check if the content contains HTML
+  const renderMessage = (content: string, category?: string) => {
+    // If it's a product recommendation, use the ProductRecommendation component
+    if (category === "product_recommendation") {
+      return (
+        <div className="product-recommendation-wrapper">
+          <ProductRecommendation
+            message={content}
+            products={[]} // In a real implementation, you would parse products from the message or fetch them
+            bundles={[]} // In a real implementation, you would parse bundles from the message or fetch them
+          />
+        </div>
+      );
+    }
+
+    // Check if the content contains HTML for order details
     if (content.includes('<div class="order-details">')) {
       return (
         <div
@@ -247,6 +261,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
         />
       );
     }
+
     // Otherwise, render as markdown with link support
     return (
       <ReactMarkdown
@@ -283,7 +298,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
       {/* Chat window */}
       {isOpen && (
         <div
-          className="w-80 sm:w-96 h-[500px] max-h-[80vh] bg-white rounded-lg shadow-xl flex flex-col mb-2 overflow-hidden"
+          className="w-96 sm:w-[450px] h-[700px] max-h-[90vh] bg-white rounded-lg shadow-xl flex flex-col mb-2 overflow-hidden"
           style={{ border: `2px solid ${primaryColor}` }}
         >
           {/* Header */}
@@ -341,7 +356,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
                     [&_strong]:font-semibold
                     [&_a]:text-blue-600 [&_a]:hover:underline`}
                   >
-                    {renderMessage(message.content)}
+                    {renderMessage(message.content, message.category)}
                   </div>
                   <div
                     className={`text-xs mt-2 ${
