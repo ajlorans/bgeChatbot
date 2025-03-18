@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState } from "react";
 import Chatbot from "./Chatbot";
+import { usePathname } from "next/navigation";
 
 interface ChatbotContextType {
   isOpen: boolean;
@@ -36,6 +37,12 @@ export const ChatbotProvider: React.FC<ChatbotProviderProps> = ({
   showChatBubble = true,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const pathname = usePathname();
+
+  // Check if we're on an agent-related page
+  const isAgentPage =
+    pathname?.includes("/agent-dashboard") ||
+    pathname?.includes("/agent-login");
 
   const openChat = () => setIsOpen(true);
   const closeChat = () => setIsOpen(false);
@@ -46,12 +53,15 @@ export const ChatbotProvider: React.FC<ChatbotProviderProps> = ({
       value={{ isOpen, openChat, closeChat, toggleChat }}
     >
       {children}
-      <Chatbot
-        initialMessage={initialMessage}
-        primaryColor={primaryColor}
-        botName={botName}
-        showChatBubble={showChatBubble}
-      />
+      {/* Only render the Chatbot if we're not on an agent page */}
+      {!isAgentPage && (
+        <Chatbot
+          initialMessage={initialMessage}
+          primaryColor={primaryColor}
+          botName={botName}
+          showChatBubble={showChatBubble}
+        />
+      )}
     </ChatbotContext.Provider>
   );
 };

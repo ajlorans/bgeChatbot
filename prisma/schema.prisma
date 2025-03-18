@@ -1,0 +1,80 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  password      String?
+  role          String    @default("customer")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  agent         Agent?
+  sessions      Session[]
+  chatSessions  ChatSession[]
+}
+
+model Agent {
+  id           String    @id @default(uuid())
+  userId       String    @unique
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isActive     Boolean   @default(true)
+  isAvailable  Boolean   @default(false)
+  role         String    @default("agent")
+  lastActive   DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  chatSessions ChatSession[]
+}
+
+model ChatSession {
+  id           String    @id @default(uuid())
+  userId       String?
+  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  agentId      String?
+  agent        Agent?    @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  isLiveChat   Boolean   @default(false)
+  status       String?
+  customerEmail String?
+  customerName String?
+  messages     Message[]
+  metadata     Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([agentId])
+}
+
+model Message {
+  id           String      @id @default(uuid())
+  sessionId    String
+  session      ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role         String
+  content      String
+  category     String?
+  timestamp    DateTime    @default(now())
+  metadata     Json?
+
+  @@index([sessionId])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionToken String   @unique
+  expires      DateTime
+  
+  @@index([userId])
+} 

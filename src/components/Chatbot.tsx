@@ -1,18 +1,25 @@
 "use client";
 
 import React, { useRef, useEffect, useState } from "react";
-import { formatDate } from "@/lib/utils";
 import {
   ChatBubbleLeftRightIcon,
   PaperAirplaneIcon,
   XMarkIcon,
+  UserIcon,
+  ClockIcon,
+  PhoneIcon,
+  ArrowPathIcon,
 } from "@heroicons/react/24/outline";
 import ReactMarkdown from "react-markdown";
 import { useChatbot } from "@/lib/useChatbot";
 import { useChatbotContext } from "./ChatbotProvider";
 import { ProductRecommendation } from "@/app/components/ProductRecommendation";
 import { rateLimiter } from "@/lib/rateLimiter";
-import { sanitizeInput, sanitizeOrderNumber, sanitizeEmail } from "@/lib/sanitizer";
+import {
+  sanitizeInput,
+  sanitizeOrderNumber,
+  sanitizeEmail,
+} from "@/lib/sanitizer";
 
 interface ChatbotProps {
   initialMessage?: string;
@@ -159,8 +166,21 @@ const Chatbot: React.FC<ChatbotProps> = ({
   const [showOrderStatusForm, setShowOrderStatusForm] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [showEmailInput, setShowEmailInput] = useState(false);
 
-  const { messages, isLoading, sendMessage } = useChatbot({
+  const {
+    messages,
+    isLoading,
+    sendMessage,
+    isLiveChat,
+    liveChatStatus,
+    liveChatDetails,
+    requestLiveAgent,
+    endLiveChat,
+    resetChat,
+  } = useChatbot({
     initialMessage,
   });
 
@@ -261,6 +281,124 @@ const Chatbot: React.FC<ChatbotProps> = ({
       e.preventDefault();
       handleSubmit(e);
     }
+  };
+
+  // Handle requesting a live agent
+  const handleRequestLiveAgent = async () => {
+    // If we already have an email, use it directly
+    if (customerEmail && validateEmail(customerEmail)) {
+      await requestLiveAgent(customerEmail);
+      setShowEmailInput(false);
+      return;
+    }
+
+    // Otherwise show the email input form
+    setShowEmailInput(true);
+  };
+
+  // Handle submitting the email for live agent
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!customerEmail) {
+      setEmailError("Please enter your email address");
+      return;
+    }
+
+    if (!validateEmail(customerEmail)) {
+      setEmailError("Please enter a valid email address");
+      return;
+    }
+
+    setEmailError("");
+    await requestLiveAgent(customerEmail);
+    setShowEmailInput(false);
+  };
+
+  // Validate email format
+  const validateEmail = (email: string) => {
+    const re = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    return re.test(email);
+  };
+
+  // Handle live chat status display
+  const renderLiveChatStatus = () => {
+    if (!isLiveChat) return null;
+
+    if (liveChatStatus === "queued") {
+      return (
+        <div className="flex items-center p-2 bg-yellow-50 border-y border-yellow-200">
+          <ClockIcon className="w-5 h-5 mr-2 text-yellow-500" />
+          <span className="text-sm">
+            Waiting for an agent
+            {liveChatDetails?.queuePosition &&
+              ` (#${liveChatDetails.queuePosition} in queue)`}
+            {liveChatDetails?.estimatedWaitTime &&
+              ` - Est. wait: ~${liveChatDetails.estimatedWaitTime} min`}
+          </span>
+        </div>
+      );
+    }
+
+    if (liveChatStatus === "active") {
+      return (
+        <div className="flex items-center p-2 bg-green-50 border-y border-green-200">
+          <UserIcon className="w-5 h-5 mr-2 text-green-500" />
+          <span className="text-sm">
+            Connected with {liveChatDetails?.agentName || "Agent"}
+          </span>
+          <button
+            onClick={endLiveChat}
+            className="ml-auto text-xs text-red-500 hover:text-red-700"
+            aria-label="End chat"
+          >
+            End chat
+          </button>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
+  // Email input form for live chat
+  const renderEmailInputForm = () => {
+    if (!showEmailInput) return null;
+
+    return (
+      <div className="p-4 bg-white border-t border-gray-200">
+        <form onSubmit={handleEmailSubmit} className="space-y-2">
+          <p className="text-sm text-gray-600">
+            Please provide your email address so our agent can assist you
+            better:
+          </p>
+          <input
+            type="email"
+            value={customerEmail}
+            onChange={(e) => setCustomerEmail(e.target.value)}
+            className="w-full p-2 border border-gray-300 rounded"
+            placeholder="your.email@example.com"
+          />
+          {emailError && <p className="text-xs text-red-500">{emailError}</p>}
+          <div className="flex justify-end space-x-2">
+            <button
+              type="button"
+              onClick={() => setShowEmailInput(false)}
+              className="px-3 py-1 text-sm text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-3 py-1 text-sm text-white rounded"
+              style={{ backgroundColor: primaryColor }}
+            >
+              Connect with Agent
+            </button>
+          </div>
+        </form>
+      </div>
+    );
   };
 
   const renderMessage = (content: string, category?: string) => {
@@ -380,8 +518,16 @@ const Chatbot: React.FC<ChatbotProps> = ({
         <>
           {/* Chat bubble prompt - only show if showChatBubble is true */}
           {showChatBubble && (
-            <div className="mb-2 bg-white rounded-lg shadow-md p-3 max-w-xs" style={{ borderColor: primaryColor, borderWidth: '1px' }}>
-              <p className="text-sm font-medium" style={{ color: primaryColor }}>Need help or have questions? Chat with me!</p>
+            <div
+              className="mb-2 bg-white rounded-lg shadow-md p-3 max-w-xs"
+              style={{ borderColor: primaryColor, borderWidth: "1px" }}
+            >
+              <p
+                className="text-sm font-medium"
+                style={{ color: primaryColor }}
+              >
+                Need help or have questions? Chat with me!
+              </p>
             </div>
           )}
           <button
@@ -421,55 +567,51 @@ const Chatbot: React.FC<ChatbotProps> = ({
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={`mb-6 flex ${
+                className={`flex ${
                   message.role === "user" ? "justify-end" : "justify-start"
-                }`}
+                } mb-3`}
               >
+                {message.role !== "user" && message.role !== "system" && (
+                  <div
+                    className="flex items-center justify-center w-8 h-8 mr-2 text-white rounded-full"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    {message.role === "agent" ? (
+                      <UserIcon className="w-5 h-5" />
+                    ) : (
+                      <ChatBubbleLeftRightIcon className="w-5 h-5" />
+                    )}
+                  </div>
+                )}
+
                 <div
-                  className={`max-w-[90%] rounded-lg px-5 py-4 ${
+                  className={`max-w-[80%] px-4 py-2 rounded-lg ${
                     message.role === "user"
-                      ? "bg-blue-600 text-white ml-auto"
-                      : "bg-gray-100 text-gray-900 mr-auto"
-                  } shadow-md`}
+                      ? "bg-blue-500 text-white rounded-br-none"
+                      : message.role === "system"
+                      ? "bg-gray-200 text-gray-700"
+                      : message.role === "agent"
+                      ? "bg-green-100 text-gray-800 rounded-bl-none border border-green-200"
+                      : "bg-gray-100 text-gray-800 rounded-bl-none"
+                  }`}
                 >
-                  <div
-                    className={`prose prose-sm max-w-none ${
-                      message.role === "user" ? "prose-invert" : ""
-                    }
-                    [&_.order-details]:bg-white [&_.order-details]:p-4 [&_.order-details]:rounded-md [&_.order-details]:shadow-sm [&_.order-details]:border [&_.order-details]:border-gray-200
-                    [&_.label]:text-gray-600 [&_.label]:font-semibold [&_.value]:ml-2 [&_.value]:text-gray-900
-                    [&_.status-item]:flex [&_.status-item]:items-center [&_.status-item]:mb-2 [&_.status-item]:p-1
-                    [&_.detail-item]:flex [&_.detail-item]:items-center [&_.detail-item]:mb-2 [&_.detail-item]:p-1 [&_.detail-item]:flex-wrap [&_.detail-item]:gap-x-2
-                    [&_.items-list]:mt-3 [&_.items-list]:space-y-2 [&_.items-list]:text-sm [&_.items-list]:border-t [&_.items-list]:border-gray-100 [&_.items-list]:pt-3
-                    [&_.tracking-link]:text-blue-600 [&_.tracking-link]:font-medium [&_.tracking-link]:hover:underline [&_.tracking-link]:hover:text-blue-700 [&_.tracking-link]:break-all
-                    [&_.processing]:text-yellow-600 [&_.processing]:font-medium
-                    [&_.completed]:text-green-600 [&_.completed]:font-medium
-                    [&_.unfulfilled]:text-gray-600 [&_.unfulfilled]:font-medium
-                    [&_.fulfilled]:text-green-600 [&_.fulfilled]:font-medium
-                    [&_.paid]:text-green-600 [&_.paid]:font-medium
-                    [&_.pending]:text-yellow-600 [&_.pending]:font-medium
-                    [&_.refunded]:text-red-600 [&_.refunded]:font-medium
-                    [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mb-3 [&_h3]:text-gray-900
-                    [&_p]:mb-3 [&_p]:leading-relaxed
-                    [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:mb-4 [&_ul]:space-y-2
-                    [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:mb-4 [&_ol]:space-y-2
-                    [&_li]:mb-2 [&_li]:pl-1
-                    [&_strong]:font-semibold
-                    [&_a]:text-blue-600 [&_a]:hover:underline
-                    [&_blockquote]:border-l-4 [&_blockquote]:border-gray-300 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-4
-                    [&_code]:bg-gray-100 [&_code]:rounded [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-sm
-                    [&_pre]:bg-gray-100 [&_pre]:rounded [&_pre]:p-3 [&_pre]:overflow-x-auto [&_pre]:my-4`}
-                  >
-                    {renderMessage(message.content, message.category)}
-                  </div>
-                  <div
-                    className={`text-xs mt-2 ${
-                      message.role === "user" ? "text-blue-50" : "text-gray-500"
-                    }`}
-                  >
-                    {formatDate(message.timestamp)}
-                  </div>
+                  {message.role === "system" ? (
+                    <p className="text-sm italic">{message.content}</p>
+                  ) : message.role === "agent" ||
+                    message.role === "assistant" ? (
+                    <div className="prose prose-sm">
+                      {renderMessage(message.content, message.category)}
+                    </div>
+                  ) : (
+                    <p>{message.content}</p>
+                  )}
                 </div>
+
+                {message.role === "user" && (
+                  <div className="flex items-center justify-center w-8 h-8 ml-2 text-white bg-blue-500 rounded-full">
+                    <UserIcon className="w-5 h-5" />
+                  </div>
+                )}
               </div>
             ))}
 
@@ -545,6 +687,10 @@ const Chatbot: React.FC<ChatbotProps> = ({
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Add this after the messages map and before the chat form */}
+          {renderLiveChatStatus()}
+          {renderEmailInputForm()}
+
           {/* Input */}
           {!showOrderStatusForm && (
             <form onSubmit={handleSubmit} className="p-3 border-t">
@@ -559,6 +705,28 @@ const Chatbot: React.FC<ChatbotProps> = ({
                   style={{ maxHeight: "100px", minHeight: "40px" }}
                   rows={1}
                 />
+                <div className="flex items-center mt-2 space-x-2">
+                  {!isLiveChat && (
+                    <button
+                      type="button"
+                      onClick={handleRequestLiveAgent}
+                      className="flex items-center px-3 py-1.5 text-sm text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
+                      disabled={isLoading}
+                    >
+                      <PhoneIcon className="w-4 h-4 mr-1" />
+                      Speak to Agent
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={resetChat}
+                    className="flex items-center px-3 py-1.5 text-sm text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
+                    aria-label="reset chat"
+                  >
+                    <ArrowPathIcon className="w-4 h-4 mr-1" />
+                    Reset
+                  </button>
+                </div>
                 <button
                   type="submit"
                   disabled={isLoading || !inputValue.trim()}

@@ -1,30 +1,37 @@
-import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import ChatbotProvider from "@/components/ChatbotProvider";
+import { ChatbotProvider } from "@/components/ChatbotProvider";
+import { UserProvider } from "@/components/UserProvider";
+import { Metadata } from "next";
+import { Suspense } from "react";
+import Providers from "@/components/Providers";
 
-const inter = Inter({ subsets: ["latin"] });
+// Load Inter font
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
-  title: "Big Green Egg - AI Chatbot",
-  description: "AI Chatbot for Big Green Egg Shopify store",
+  title: "BGE Chatbot",
+  description: "A chatbot for BGE",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
-        <ChatbotProvider
-          initialMessage="Hi there! I'm your Big Green Egg assistant. How can I help you today?"
-          primaryColor="#006838"
-          botName="BGE Assistant"
-        >
-          {children}
-        </ChatbotProvider>
+    <html lang="en" className={`${inter.className} antialiased`}>
+      <body className="overflow-hidden">
+        <Providers>
+          <UserProvider>
+            <ChatbotProvider>
+              <Suspense fallback={<div>Loading...</div>}>{children}</Suspense>
+            </ChatbotProvider>
+          </UserProvider>
+        </Providers>
       </body>
     </html>
   );
