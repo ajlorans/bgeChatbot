@@ -124,7 +124,7 @@ export default function AgentDashboardLayout({
                         user.status || "active"
                       )} mr-2`}
                     ></span>
-                    <span className="capitalize">
+                    <span className="capitalize text-gray-900">
                       {user.status || "active"}
                     </span>
                   </button>
@@ -132,21 +132,21 @@ export default function AgentDashboardLayout({
                     <div className="py-1">
                       <button
                         onClick={() => updateStatus("active")}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-900 hover:bg-gray-100"
                       >
                         <span className="h-2 w-2 rounded-full bg-green-500 inline-block mr-2"></span>
                         Active
                       </button>
                       <button
                         onClick={() => updateStatus("away")}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-900 hover:bg-gray-100"
                       >
                         <span className="h-2 w-2 rounded-full bg-yellow-500 inline-block mr-2"></span>
                         Away
                       </button>
                       <button
                         onClick={() => updateStatus("offline")}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-900 hover:bg-gray-100"
                       >
                         <span className="h-2 w-2 rounded-full bg-gray-500 inline-block mr-2"></span>
                         Offline
@@ -158,7 +158,7 @@ export default function AgentDashboardLayout({
 
               {/* User info */}
               <div className="flex items-center">
-                <span className="text-sm font-medium text-gray-700 mr-2">
+                <span className="text-sm font-medium text-gray-900 mr-2">
                   {user.name || user.email}
                 </span>
                 <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-white">
@@ -169,7 +169,7 @@ export default function AgentDashboardLayout({
               {/* Logout button */}
               <button
                 onClick={handleLogout}
-                className="ml-4 px-3 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded"
+                className="ml-4 px-3 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded text-gray-900"
               >
                 Logout
               </button>
@@ -185,6 +185,28 @@ export default function AgentDashboardLayout({
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           } md:translate-x-0 transition duration-200 ease-in-out z-10`}
         >
+          {/* Close button for mobile */}
+          <button
+            type="button"
+            className="absolute top-4 right-4 md:hidden text-gray-400 hover:text-gray-500"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <span className="sr-only">Close sidebar</span>
+            <svg
+              className="h-6 w-6"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
           <div className="h-full flex flex-col mt-5 overflow-y-auto">
             <nav className="flex-1 px-2 space-y-1">
               {/* Dashboard */}
@@ -367,6 +389,14 @@ export default function AgentDashboardLayout({
           {isConnected ? "Connected" : "Disconnected"}
         </div>
       </footer>
+
+      {/* Overlay for mobile menu */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-gray-600 bg-opacity-75 z-0 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
     </div>
   );
 }

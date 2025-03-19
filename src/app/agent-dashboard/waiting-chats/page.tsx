@@ -161,11 +161,11 @@ export default function WaitingChatsPage() {
       {/* Refresh rate selector */}
       <div className="mb-4 flex justify-between items-center">
         <div className="flex items-center space-x-2">
-          <span className="text-sm text-gray-600">Refresh rate:</span>
+          <span className="text-sm text-gray-900">Refresh rate:</span>
           <select
             value={refreshInterval}
             onChange={(e) => setRefreshInterval(Number(e.target.value))}
-            className="text-sm border rounded p-1"
+            className="text-sm border rounded p-1 text-gray-900 bg-white"
           >
             <option value={5}>5 seconds</option>
             <option value={15}>15 seconds</option>
@@ -174,7 +174,7 @@ export default function WaitingChatsPage() {
           </select>
         </div>
 
-        <span className="text-sm text-gray-500">
+        <span className="text-sm text-gray-900">
           {sessions.length} waiting{" "}
           {sessions.length === 1 ? "customer" : "customers"}
         </span>
@@ -220,103 +220,111 @@ export default function WaitingChatsPage() {
         </div>
       ) : (
         <div className="bg-white shadow-md rounded-lg overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Customer
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Waiting Since
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Time in Queue
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Messages
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {sessions.map((session) => (
-                <tr
-                  key={session.id}
-                  className="hover:bg-gray-50 transition-colors duration-150"
-                >
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10 bg-green-100 rounded-full flex items-center justify-center">
-                        <span className="text-green-600 font-medium">
-                          {session.customerName?.charAt(0) || "?"}
-                        </span>
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {session.customerName || "Anonymous"}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {session.customerEmail || "No email provided"}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">
-                      {formatTime(session.createdAt)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 font-medium">
-                      {getTimeInQueue(session.createdAt)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                      {session.messageCount || 0}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => claimSession(session.id)}
-                      disabled={claimingSession === session.id}
-                      className={`${
-                        claimingSession === session.id
-                          ? "bg-gray-100 text-gray-500 cursor-not-allowed"
-                          : "bg-green-50 text-green-600 hover:text-green-900"
-                      } px-3 py-1 rounded transition-colors duration-150`}
-                    >
-                      {claimingSession === session.id ? (
-                        <>
-                          <span className="inline-block w-4 h-4 mr-1 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></span>
-                          Claiming...
-                        </>
-                      ) : (
-                        "Claim Chat"
-                      )}
-                    </button>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th
+                    scope="col"
+                    className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Customer
+                  </th>
+                  <th
+                    scope="col"
+                    className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Waiting Since
+                  </th>
+                  <th
+                    scope="col"
+                    className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Time in Queue
+                  </th>
+                  <th
+                    scope="col"
+                    className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Messages
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {sessions.map((session) => (
+                  <tr
+                    key={session.id}
+                    className="hover:bg-gray-50 transition-colors duration-150"
+                  >
+                    <td className="px-4 sm:px-6 py-4">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-10 w-10 bg-green-100 rounded-full flex items-center justify-center">
+                          <span className="text-green-600 font-medium">
+                            {session.customerName?.charAt(0) || "?"}
+                          </span>
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {session.customerName || "Anonymous"}
+                          </div>
+                          <div className="text-sm text-gray-900">
+                            {session.customerEmail || "No email provided"}
+                          </div>
+                          {/* Mobile-only info */}
+                          <div className="sm:hidden mt-1 text-xs text-gray-900">
+                            <div>Waiting since: {formatTime(session.createdAt)}</div>
+                            <div>Time in queue: {getTimeInQueue(session.createdAt)}</div>
+                            <div>Messages: {session.messageCount || 0}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {formatTime(session.createdAt)}
+                      </div>
+                    </td>
+                    <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 font-medium">
+                        {getTimeInQueue(session.createdAt)}
+                      </div>
+                    </td>
+                    <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap text-center">
+                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                        {session.messageCount || 0}
+                      </span>
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right">
+                      <button
+                        onClick={() => claimSession(session.id)}
+                        disabled={claimingSession === session.id}
+                        className={`${
+                          claimingSession === session.id
+                            ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+                            : "bg-green-50 text-green-600 hover:text-green-900"
+                        } px-3 py-1 rounded transition-colors duration-150 w-full sm:w-auto`}
+                      >
+                        {claimingSession === session.id ? (
+                          <>
+                            <span className="inline-block w-4 h-4 mr-1 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></span>
+                            Claiming...
+                          </>
+                        ) : (
+                          "Claim Chat"
+                        )}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

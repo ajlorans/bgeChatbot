@@ -36,7 +36,8 @@ interface ChatMessage {
 
 export default function ActiveChatsPage() {
   const router = useRouter();
-  const { socket, isConnected } = useSocket();
+  const socketContext = useSocket();
+  const { socket, isConnected } = socketContext || {};
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -137,8 +138,8 @@ export default function ActiveChatsPage() {
           };
           return newSessions;
         } else if (
-          updatedSession.status === "active" ||
-          updatedSession.status === "waiting"
+          updatedSession.status === "active" && 
+          updatedSession.agentId // Only add if there's an agent assigned
         ) {
           // Add this new session
           return [...prevSessions, updatedSession];
@@ -164,7 +165,7 @@ export default function ActiveChatsPage() {
     try {
       setLoading(true);
 
-      // First fetch active sessions
+      // Only fetch active sessions assigned to the current agent
       const activeResponse = await fetch("/api/agent/sessions?status=active", {
         credentials: "include",
       });
@@ -175,27 +176,8 @@ export default function ActiveChatsPage() {
 
       const activeData = await activeResponse.json();
 
-      // Then fetch waiting sessions
-      const waitingResponse = await fetch(
-        "/api/agent/sessions?status=waiting",
-        {
-          credentials: "include",
-        }
-      );
-
-      if (!waitingResponse.ok) {
-        throw new Error("Failed to fetch waiting sessions");
-      }
-
-      const waitingData = await waitingResponse.json();
-
-      // Combine active and waiting sessions
-      const combinedSessions = [
-        ...activeData.sessions,
-        ...waitingData.sessions,
-      ];
-
-      setSessions(combinedSessions);
+      // Set only the active sessions, not waiting ones
+      setSessions(activeData.sessions);
     } catch (err) {
       console.error("Error fetching sessions:", err);
       setError("Failed to load sessions");
@@ -275,20 +257,20 @@ export default function ActiveChatsPage() {
   return (
     <div className="container mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-800">Chat Dashboard</h1>
+        <h1 className="text-2xl font-semibold text-gray-800">Active Chats</h1>
         <p className="text-sm text-gray-500">
-          Manage active chats and respond to waiting customers
+          Manage your current active chat sessions
         </p>
       </div>
 
       {/* Refresh rate selector */}
       <div className="mb-4 flex justify-between items-center">
         <div className="flex items-center space-x-2">
-          <span className="text-sm text-gray-600">Refresh rate:</span>
+          <span className="text-sm text-gray-900">Refresh rate:</span>
           <select
             value={refreshInterval}
             onChange={(e) => setRefreshInterval(Number(e.target.value))}
-            className="text-sm border rounded p-1"
+            className="text-sm border rounded p-1 text-gray-900 bg-white"
           >
             <option value={10}>10 seconds</option>
             <option value={30}>30 seconds</option>
@@ -297,9 +279,8 @@ export default function ActiveChatsPage() {
           </select>
         </div>
 
-        <span className="text-sm text-gray-500">
-          {sessions.length} {sessions.length === 1 ? "session" : "sessions"} (
-          {sessions.filter((s) => s.status === "waiting").length} waiting)
+        <span className="text-sm text-gray-900">
+          {sessions.length} {sessions.length === 1 ? "session" : "sessions"}
         </span>
       </div>
 
@@ -335,151 +316,149 @@ export default function ActiveChatsPage() {
             />
           </svg>
           <h3 className="mt-4 text-lg font-medium text-gray-900">
-            No active or waiting chats
+            No active chats
           </h3>
           <p className="mt-1 text-gray-500">
-            You don&apos;t have any chat sessions at the moment.
+            You don&apos;t have any active chat sessions at the moment.
           </p>
         </div>
       ) : (
         <div className="bg-white shadow-md rounded-lg overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Customer
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Status
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Last Message
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Last Updated
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {sessions.map((session) => (
-                <tr
-                  key={session.id}
-                  className="hover:bg-gray-50 transition-colors duration-150"
-                >
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <span className="text-blue-600 font-medium">
-                          {session.customerName?.charAt(0) || "?"}
-                        </span>
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {session.customerName || "Anonymous"}
-                          {session.unreadCount && session.unreadCount > 0 ? (
-                            <span className="ml-2 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-                              {session.unreadCount}
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {session.customerEmail || "No email provided"}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        session.status === "waiting"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-green-100 text-green-800"
-                      }`}
-                    >
-                      {session.status === "waiting" ? "Waiting" : "Active"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm text-gray-900 max-w-xs truncate">
-                      {session.recentMessages &&
-                      session.recentMessages.filter(
-                        (msg: RecentMessage) =>
-                          !msg.isAgent && msg.role !== "agent"
-                      ).length > 0 ? (
-                        session.recentMessages
-                          .filter(
-                            (msg: RecentMessage) =>
-                              !msg.isAgent && msg.role !== "agent"
-                          )
-                          .slice(0, 1)
-                          .map((message: RecentMessage) => (
-                            <p
-                              key={message.id}
-                              className="text-sm text-gray-500 truncate"
-                            >
-                              {message.content}
-                            </p>
-                          ))
-                      ) : (
-                        <p className="text-sm text-gray-600 italic">
-                          No customer messages yet
-                        </p>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-500">
-                      {getTimeElapsed(session.updatedAt)}
-                    </div>
-                    <div className="text-xs text-gray-600">
-                      {formatTime(session.updatedAt)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                    {session.status === "waiting" ? (
-                      <button
-                        onClick={() => joinChat(session.id)}
-                        className="text-green-600 hover:text-green-900 bg-green-50 px-3 py-1 rounded"
-                      >
-                        Accept Chat
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => joinChat(session.id)}
-                        className="text-blue-600 hover:text-blue-900 bg-blue-50 px-3 py-1 rounded"
-                      >
-                        Join Chat
-                      </button>
-                    )}
-                    <button
-                      onClick={() => endChat(session.id)}
-                      className="text-red-600 hover:text-red-900 bg-red-50 px-3 py-1 rounded"
-                    >
-                      End Chat
-                    </button>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th
+                    scope="col"
+                    className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Customer
+                  </th>
+                  <th
+                    scope="col"
+                    className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Last Message
+                  </th>
+                  <th
+                    scope="col"
+                    className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Last Updated
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-4 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {sessions.map((session) => (
+                  <tr
+                    key={session.id}
+                    className="hover:bg-gray-50 transition-colors duration-150"
+                  >
+                    <td className="px-4 sm:px-6 py-4">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
+                          <span className="text-blue-600 font-medium">
+                            {session.customerName?.charAt(0) || "?"}
+                          </span>
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {session.customerName || "Anonymous"}
+                            {session.unreadCount && session.unreadCount > 0 ? (
+                              <span className="ml-2 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                                {session.unreadCount}
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="text-sm text-gray-900">
+                            {session.customerEmail || "No email provided"}
+                          </div>
+                          {/* Mobile-only info */}
+                          <div className="sm:hidden mt-1 text-xs text-gray-900">
+                            <div>Last updated: {getTimeElapsed(session.updatedAt)}</div>
+                            {session.recentMessages &&
+                            session.recentMessages.filter(
+                              (msg: RecentMessage) =>
+                                !msg.isAgent && msg.role !== "agent"
+                            ).length > 0 ? (
+                              <div className="truncate">
+                                Last message:{" "}
+                                {session.recentMessages
+                                  .filter(
+                                    (msg: RecentMessage) =>
+                                      !msg.isAgent && msg.role !== "agent"
+                                  )
+                                  .slice(0, 1)
+                                  .map((message: RecentMessage) => message.content)}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="hidden sm:table-cell px-6 py-4">
+                      <div className="text-sm text-gray-900 max-w-xs truncate">
+                        {session.recentMessages &&
+                        session.recentMessages.filter(
+                          (msg: RecentMessage) =>
+                            !msg.isAgent && msg.role !== "agent"
+                        ).length > 0 ? (
+                          session.recentMessages
+                            .filter(
+                              (msg: RecentMessage) =>
+                                !msg.isAgent && msg.role !== "agent"
+                            )
+                            .slice(0, 1)
+                            .map((message: RecentMessage) => (
+                              <p
+                                key={message.id}
+                                className="text-sm text-gray-900 truncate"
+                              >
+                                {message.content}
+                              </p>
+                            ))
+                        ) : (
+                          <p className="text-sm text-gray-900 italic">
+                            No customer messages yet
+                          </p>
+                        )}
+                      </div>
+                    </td>
+                    <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {getTimeElapsed(session.updatedAt)}
+                      </div>
+                      <div className="text-xs text-gray-900">
+                        {formatTime(session.updatedAt)}
+                      </div>
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right">
+                      <div className="flex flex-col sm:flex-row gap-2 justify-end">
+                        <button
+                          onClick={() => joinChat(session.id)}
+                          className="text-blue-600 hover:text-blue-900 bg-blue-50 px-3 py-1 rounded w-full sm:w-auto"
+                        >
+                          Join Chat
+                        </button>
+                        <button
+                          onClick={() => endChat(session.id)}
+                          className="text-red-600 hover:text-red-900 bg-red-50 px-3 py-1 rounded w-full sm:w-auto"
+                        >
+                          End Chat
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
