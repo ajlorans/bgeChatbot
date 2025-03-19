@@ -1,0 +1,5 @@
+[33mcommit 409c56a7a02f6427e7452d36c36831c176fd04d3[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmulti-agent-enhancements[m[33m)[m
+Author: Austin Lorans <austin.lorans@biggreenegg.com>
+Date:   Wed Mar 19 15:16:45 2025 -0400
+
+    Add multi-agent enhancements, session cleanup, and improved agent status
