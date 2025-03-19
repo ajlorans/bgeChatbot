@@ -2,22 +2,16 @@
  * Basic chat message type definition
  */
 export interface Message {
-  id: string;
+  id?: string;
   content: string;
-  role: string;
+  role: "agent" | "customer" | "system";
   timestamp: string;
-  sender?: {
-    id: string;
-    name: string;
-  };
   isAgent?: boolean;
   isSystem?: boolean;
+  sender?: string;
+  metadata?: any;
+  chatSessionId?: string;
   category?: string;
-  metadata?: {
-    chatSessionId?: string;
-    [key: string]: unknown;
-  };
-  receivedAt?: number;
 }
 
 /**
@@ -41,3 +35,18 @@ export type LiveChatStatus =
   | "active"
   | "ended"
   | "closed";
+
+export interface ChatSession {
+  id: string;
+  customerName: string | null;
+  customerEmail: string | null;
+  status: "waiting" | "active" | "ended" | "closed";
+  createdAt: string;
+  updatedAt: string;
+  agentId?: string;
+  agentName?: string;
+  lastMessage?: string;
+  unreadCount?: number;
+  recentMessages?: Message[];
+  metadata?: any;
+}

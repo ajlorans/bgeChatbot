@@ -87,7 +87,7 @@ export function ChatInput({
 
         <form onSubmit={handleSubmit} className="flex items-start space-x-2">
           <textarea
-            className="flex-1 border border-gray-300 dark:border-gray-700 rounded-md p-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-800 dark:text-white resize-none min-h-[60px]"
+            className="flex-1 border border-gray-300 dark:border-gray-700 rounded-md p-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500 dark:bg-gray-800 dark:text-white resize-none min-h-[60px] text-gray-900"
             placeholder="Type your message..."
             value={input}
             onChange={handleInputChange}

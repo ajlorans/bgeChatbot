@@ -17,11 +17,12 @@ interface Message {
     chatSessionId?: string;
     [key: string]: unknown;
   };
+  role: string;
 }
 
 interface ChatSession {
   id: string;
-  status: string;
+  status: 'waiting' | 'active' | 'ended' | 'closed';
   customerName: string | null;
   customerEmail: string | null;
   customerMetadata?: any;
@@ -34,7 +35,8 @@ interface ChatSession {
 export default function ChatSessionPage() {
   const params = useParams() as { id: string };
   const router = useRouter();
-  const { socket, isConnected } = useSocket();
+  const socketContext = useSocket();
+  const { socket, isConnected } = socketContext || {};
   const [session, setSession] = useState<ChatSession | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -47,6 +49,12 @@ export default function ChatSessionPage() {
   );
   const messageEndRef = useRef<HTMLDivElement>(null);
   const id = params.id;
+
+  // Style for debug info - temporary
+  const textXxs = {
+    fontSize: '0.6rem',
+    lineHeight: '0.75rem',
+  };
 
   // Fetch chat session details and messages
   useEffect(() => {
@@ -95,52 +103,70 @@ export default function ChatSessionPage() {
   useEffect(() => {
     if (!socket || !isConnected || !id) return;
 
-    // Debug that socket is connected
-    console.log(`Socket connected: ${socket.id}, for session: ${id}`);
+    console.log(`Subscribing to socket events for chat session ${id}`);
 
-    // Register for session events
+    // Join the session room
     socket.emit("joinSession", id);
-    console.log(`Agent requested to join room: ${id}`);
+    console.log(`Joined room for session: ${id}`);
 
-    // Set up periodic refresh polling to get fresh data in case we miss socket events
-    const refreshInterval = setInterval(() => {
-      console.log("Refreshing chat session data...");
-
-      // Fetch messages
-      fetch(`/api/agent/sessions/${id}/messages`, {
-        credentials: "include",
-        headers: {
-          "Cache-Control": "no-cache",
-          Pragma: "no-cache",
-        },
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.messages && data.messages.length > 0) {
-            // Process messages to avoid duplicates
-            setMessages((prevMessages) => {
-              // Create a set of existing message IDs for quick lookup
-              const existingIds = new Set(prevMessages.map((m) => m.id));
-
-              // Filter to only include new messages
-              const newMessages = data.messages.filter(
-                (msg: any) => !existingIds.has(msg.id)
-              );
-
-              if (newMessages.length > 0) {
-                console.log(
-                  `Adding ${newMessages.length} new messages from polling`
-                );
-                return [...prevMessages, ...newMessages];
-              }
-
-              return prevMessages;
+    // Ensure agent can see all messages by getting the full history first
+    const refreshMessages = async () => {
+      try {
+        const messagesResponse = await fetch(
+          `/api/agent/sessions/${id}/messages`,
+          { credentials: "include" }
+        );
+        if (messagesResponse.ok) {
+          const messagesData = await messagesResponse.json();
+          
+          // Check if we have new messages
+          if (messagesData.messages && messagesData.messages.length > 0) {
+            console.log(`Loaded ${messagesData.messages.length} messages from API`);
+            
+            // Merge the API messages with existing messages, preserving local classifications
+            setMessages(prevMessages => {
+              // Create a map of existing messages by ID
+              const existingMessages = new Map();
+              prevMessages.forEach(msg => {
+                existingMessages.set(msg.id, msg);
+              });
+              
+              // Merge new messages, preserving agent/customer flags from existing messages
+              const mergedMessages = messagesData.messages.map((apiMsg: any) => {
+                // If message exists locally and is marked as from agent, preserve that
+                if (existingMessages.has(apiMsg.id) && existingMessages.get(apiMsg.id).isAgent) {
+                  console.log(`Preserving agent status for message ${apiMsg.id}`);
+                  return {
+                    ...apiMsg,
+                    isAgent: true,
+                    sender: "Agent"
+                  };
+                }
+                
+                // Ensure proper formatting for API messages
+                return {
+                  ...apiMsg,
+                  isAgent: apiMsg.role === 'agent' || apiMsg.sender === 'Agent',
+                  isSystem: apiMsg.role === 'system' || apiMsg.sender === 'System'
+                };
+              });
+              
+              return mergedMessages;
             });
           }
-        })
-        .catch((error) => {
-          console.error("Error refreshing messages:", error);
-        });
+        }
+      } catch (err) {
+        console.error("Error refreshing messages:", err);
+      }
+    };
+
+    // Initial refresh
+    refreshMessages();
+
+    // Set up a refresh interval
+    const refreshInterval = setInterval(() => {
+      console.log("Refreshing chat session data...");
+      refreshMessages();
 
       // Also refresh session status to detect closed sessions
       fetch(`/api/agent/sessions/${id}`, { credentials: "include" })
@@ -181,6 +207,7 @@ export default function ChatSessionPage() {
                     isAgent: false,
                     isSystem: true,
                     metadata: { chatSessionId: id, endedBy: "customer" },
+                    role: "system"
                   },
                 ];
               });
@@ -195,6 +222,9 @@ export default function ChatSessionPage() {
     // Handle incoming messages from the socket
     const handleNewMessage = (message: any) => {
       console.log("⚡ Socket received message:", message);
+      console.log("Message role:", message.role);
+      console.log("Message isAgent:", message.isAgent);
+      console.log("Message sender:", message.sender);
 
       // Check if message is valid
       if (!message || !message.content) {
@@ -229,16 +259,22 @@ export default function ChatSessionPage() {
       // Determine sender based on multiple possible properties
       let sender = "Customer";
       let isSystemMessage = false;
+      let isAgentMessage = false;
 
-      if (message.isAgent || message.role === "agent") {
+      if (message.isAgent || message.role === "agent" || message.sender === "Agent") {
         sender = "Agent";
+        isAgentMessage = true;
       } else if (message.isSystem || message.role === "system") {
         sender = "System";
         isSystemMessage = true;
-      } else if (message.sender === "Agent") {
-        sender = "Agent";
       } else if (message.sender) {
+        // Handle customer messages - preserve the original sender name if it exists
         sender = message.sender;
+        // Only override if it's explicitly marked as an agent message
+        if (message.sender.toLowerCase() === "agent") {
+          sender = "Agent";
+          isAgentMessage = true;
+        }
       }
 
       // Parse timestamp with fallback
@@ -265,12 +301,16 @@ export default function ChatSessionPage() {
         content: message.content,
         sender: sender,
         timestamp: timestamp,
-        isAgent: sender === "Agent",
+        isAgent: isAgentMessage,
         isSystem: isSystemMessage,
         metadata: message.metadata || {},
+        role: isAgentMessage ? "agent" : isSystemMessage ? "system" : "customer"
       };
 
       console.log("📝 Adding formatted message:", formattedMessage);
+      console.log(`Message is from agent? ${formattedMessage.isAgent}`);
+      console.log(`Message sender: ${formattedMessage.sender}`);
+      console.log(`Message role: ${formattedMessage.role}`);
 
       // Add the message to the list, avoiding duplicates
       setMessages((prev) => {
@@ -278,6 +318,15 @@ export default function ChatSessionPage() {
         const duplicateIdIndex = prev.findIndex((m) => m.id === messageId);
         if (duplicateIdIndex !== -1) {
           console.log("🔄 Skipping duplicate message (same ID)");
+          
+          // If it's a temp message that's now confirmed, make sure isAgent is correct
+          if (prev[duplicateIdIndex].id.startsWith('temp-') && sender === 'Agent') {
+            console.log("🔄 Replacing temp message with confirmed agent message");
+            const updatedMessages = [...prev];
+            updatedMessages[duplicateIdIndex] = formattedMessage;
+            return updatedMessages;
+          }
+          
           return prev;
         }
 
@@ -367,6 +416,7 @@ export default function ChatSessionPage() {
         isAgent: true,
         isSystem: false,
         metadata: { chatSessionId: id },
+        role: "agent"
       };
 
       // Add the message to local state immediately for better UX
@@ -429,6 +479,7 @@ export default function ChatSessionPage() {
               isAgent: true,
               isSystem: false,
               metadata: data.message.metadata || { chatSessionId: id },
+              role: "agent"
             },
           ];
         });
@@ -469,6 +520,11 @@ export default function ChatSessionPage() {
 
       const data = await response.json();
       setSession(data.session);
+
+      // Emit chatEnded event
+      if (socket) {
+        socket.emit("endChat", id);
+      }
     } catch (err) {
       console.error("Error ending session:", err);
       setError("Failed to end session");
@@ -574,10 +630,10 @@ export default function ChatSessionPage() {
             <button
               onClick={endSession}
               disabled={
-                session?.status === "ended" || session?.status === "closed"
+                session?.status !== "active"
               }
               className={`px-3 py-1.5 rounded text-white ${
-                session?.status === "ended" || session?.status === "closed"
+                session?.status !== "active"
                   ? "bg-gray-400 cursor-not-allowed"
                   : "bg-red-500 hover:bg-red-600"
               }`}
@@ -607,10 +663,10 @@ export default function ChatSessionPage() {
               <div
                 key={`${message.id}-${index}`}
                 className={`flex ${
-                  message.isAgent ? "justify-start" : "justify-end"
+                  message.isAgent || message.role === "agent" ? "justify-end" : "justify-start"
                 }`}
               >
-                {message.isSystem ? (
+                {message.isSystem || message.role === "system" ? (
                   <div className="bg-gray-100 text-gray-600 rounded-lg p-3 max-w-md text-sm">
                     <div>{message.content}</div>
                     <div className="text-xs text-gray-500 mt-1">
@@ -620,15 +676,20 @@ export default function ChatSessionPage() {
                 ) : (
                   <div
                     className={`rounded-lg p-3 max-w-md ${
-                      message.isAgent
-                        ? "bg-gray-200 text-gray-800"
-                        : "bg-blue-500 text-white"
+                      message.isAgent || message.role === "agent"
+                        ? "bg-blue-500 text-white"
+                        : "bg-gray-200 text-gray-800"
                     }`}
                   >
+                    <div className="font-medium text-xs mb-1">
+                      {message.isAgent || message.role === "agent" ? "You (Agent)" : message.sender || "Customer"}
+                      {/* Debug info - only temporary */}
+                      <span className="text-xxs opacity-70" style={textXxs}> [id: {message.id.substring(0, 4)}... | role: {message.role || 'unset'} | agent: {message.isAgent ? 'true' : 'false'}]</span>
+                    </div>
                     <div>{message.content}</div>
                     <div
                       className={`text-xs mt-1 ${
-                        message.isAgent ? "text-gray-500" : "text-blue-100"
+                        message.isAgent || message.role === "agent" ? "text-blue-100" : "text-gray-500"
                       }`}
                     >
                       {formatTimestamp(message.timestamp)}
@@ -662,21 +723,21 @@ export default function ChatSessionPage() {
         </div>
 
         {/* Customer information panel */}
-        <div className="w-64 bg-gray-50 border-l overflow-y-auto p-4">
-          <h2 className="font-medium mb-3">Customer Information</h2>
+        <div className="w-64 bg-gray-50 border-l overflow-y-auto p-4 ">
+          <h2 className="font-medium mb-3 text-gray-900">Customer Information</h2>
 
           <div className="mb-4">
             <h3 className="text-xs uppercase text-gray-500 font-medium">
               Name
             </h3>
-            <p className="text-sm">{session.customerName || "Anonymous"}</p>
+            <p className="text-sm text-gray-900">{session.customerName || "Anonymous"}</p>
           </div>
 
           <div className="mb-4">
             <h3 className="text-xs uppercase text-gray-500 font-medium">
               Email
             </h3>
-            <p className="text-sm">{session.customerEmail || "Not provided"}</p>
+            <p className="text-sm text-gray-900">{session.customerEmail || "Not provided"}</p>
           </div>
 
           <div className="mb-4">
@@ -756,7 +817,7 @@ export default function ChatSessionPage() {
       </div>
 
       {/* Chat input */}
-      <div className="p-3 bg-white border-t">
+      <div className="p-3 bg-white border-t text-gray-900">
         <form onSubmit={(e) => e.preventDefault()} className="flex">
           <textarea
             value={inputValue}

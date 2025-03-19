@@ -19,6 +19,11 @@ interface LiveChatProps {
   initialMessage?: string;
 }
 
+interface ChatEndedData {
+  sessionId: string;
+  endedBy: 'agent' | 'customer';
+}
+
 const LiveChat: React.FC<LiveChatProps> = ({
   primaryColor = "#4f46e5",
   companyName = "Customer Support",
@@ -37,7 +42,8 @@ const LiveChat: React.FC<LiveChatProps> = ({
   const [agentTyping, setAgentTyping] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { socket, isConnected, lastMessage } = useSocket();
+  const socketContext = useSocket();
+  const { socket, isConnected, lastMessage } = socketContext || {};
 
   // Initialize chat with system message
   useEffect(() => {
@@ -77,9 +83,28 @@ const LiveChat: React.FC<LiveChatProps> = ({
     if (!socket || !sessionId) return;
 
     // Subscribe to typing events
-    socket.on("agentTyping", (data) => {
+    socket.on("agentTyping", (data: { sessionId: string; isTyping: boolean }) => {
       if (data.sessionId === sessionId) {
         setAgentTyping(data.isTyping);
+      }
+    });
+
+    // Handle chat ended events
+    socket.on("chatEnded", (data: ChatEndedData) => {
+      if (data.sessionId === sessionId) {
+        // Reset all chat state
+        setSessionId(null);
+        setShowForm(true);
+        setCustomerInfo({ name: "", email: "" });
+        setMessages([
+          {
+            content: initialMessage,
+            role: "system",
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+        setInputValue("");
+        setFormError("");
       }
     });
 
@@ -89,9 +114,10 @@ const LiveChat: React.FC<LiveChatProps> = ({
     // Cleanup
     return () => {
       socket.off("agentTyping");
+      socket.off("chatEnded");
       socket.emit("leaveSession", sessionId);
     };
-  }, [socket, sessionId]);
+  }, [socket, sessionId, initialMessage]);
 
   // Start a new chat session
   const startChatSession = async () => {
@@ -129,11 +155,14 @@ const LiveChat: React.FC<LiveChatProps> = ({
       setShowForm(false);
 
       // Add system message
-      setMessages((prev) => [
-        ...prev,
+      setMessages([
         {
-          content:
-            "You are now connected with our support team. An agent will be with you shortly.",
+          content: initialMessage,
+          role: "system",
+          timestamp: new Date().toISOString(),
+        },
+        {
+          content: "You are now connected with our support team. An agent will be with you shortly.",
           role: "system",
           timestamp: new Date().toISOString(),
         },
@@ -418,7 +447,7 @@ const LiveChat: React.FC<LiveChatProps> = ({
             >
               <input
                 type="text"
-                className="flex-1 p-2 border rounded-l focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 p-2 border rounded-l focus:outline-none focus:ring-2 focus:ring-blue-500 "
                 placeholder="Type your message..."
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}

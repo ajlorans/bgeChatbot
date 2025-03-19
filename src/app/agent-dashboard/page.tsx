@@ -22,7 +22,8 @@ interface ActivityItem {
 
 export default function AgentDashboardPage() {
   const { user } = useUser();
-  const { isConnected } = useSocket();
+  const socketContext = useSocket();
+  const { isConnected } = socketContext || {};
   const [stats, setStats] = useState<DashboardStats>({
     activeSessions: 0,
     waitingSessions: 0,
@@ -227,7 +228,7 @@ export default function AgentDashboardPage() {
                   href="/agent-dashboard/active-chats"
                   className="text-sm text-blue-600 hover:text-blue-800 font-medium"
                 >
-                  View active chats →
+                  View your active conversations →
                 </Link>
               </div>
             )}
@@ -286,7 +287,7 @@ export default function AgentDashboardPage() {
                   href="/agent-dashboard/waiting-chats"
                   className="text-sm text-blue-600 hover:text-blue-800 font-medium"
                 >
-                  View waiting customers →
+                  Claim waiting customers →
                 </Link>
               </div>
             )}
