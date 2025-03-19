@@ -522,8 +522,8 @@ export default function ChatSessionPage() {
       setSession(data.session);
 
       // Emit chatEnded event
-      if (socket) {
-        socket.emit("endChat", id);
+      if (socketContext) {
+        socketContext.emitEvent("endChat", id);
       }
     } catch (err) {
       console.error("Error ending session:", err);
@@ -682,7 +682,15 @@ export default function ChatSessionPage() {
                     }`}
                   >
                     <div className="font-medium text-xs mb-1">
-                      {message.isAgent || message.role === "agent" ? "You (Agent)" : message.sender || "Customer"}
+                      {message.isAgent || message.role === "agent" ? (
+                        <>
+                          <span>{session?.agentName || "Agent"}</span>
+                          <br />
+                          You (Agent)
+                        </>
+                      ) : (
+                        message.sender || "Customer"
+                      )}
                       {/* Debug info - only temporary */}
                       <span className="text-xxs opacity-70" style={textXxs}> [id: {message.id.substring(0, 4)}... | role: {message.role || 'unset'} | agent: {message.isAgent ? 'true' : 'false'}]</span>
                     </div>

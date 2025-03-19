@@ -10,6 +10,7 @@ interface Message {
   role: "agent" | "customer" | "system";
   timestamp: string;
   isRead?: boolean;
+  sender?: string;
 }
 
 interface LiveChatProps {
@@ -90,19 +91,22 @@ const LiveChat: React.FC<LiveChatProps> = ({
     });
 
     // Handle chat ended events
-    socket.on("chatEnded", (data: ChatEndedData) => {
+    socket.on("chatEnded", (data: { sessionId: string; endedBy: 'agent' | 'customer' }) => {
       if (data.sessionId === sessionId) {
+        // Add a system message indicating the chat was ended
+        setMessages(prev => [
+          ...prev,
+          {
+            content: `Chat ended by ${data.endedBy}.`,
+            role: "system",
+            timestamp: new Date().toISOString(),
+          }
+        ]);
+
         // Reset all chat state
         setSessionId(null);
         setShowForm(true);
         setCustomerInfo({ name: "", email: "" });
-        setMessages([
-          {
-            content: initialMessage,
-            role: "system",
-            timestamp: new Date().toISOString(),
-          },
-        ]);
         setInputValue("");
         setFormError("");
       }
@@ -397,6 +401,11 @@ const LiveChat: React.FC<LiveChatProps> = ({
                             : "bg-white border text-gray-800"
                         }`}
                       >
+                        {msg.role === "agent" && (
+                          <div className="text-xs font-medium text-gray-600 mb-1">
+                            {msg.sender || "Agent"}
+                          </div>
+                        )}
                         {msg.content}
                         <div
                           className={`text-xs mt-1 ${

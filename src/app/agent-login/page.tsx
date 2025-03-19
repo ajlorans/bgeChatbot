@@ -43,7 +43,7 @@ export default function AgentLogin() {
               priority
             />
           </div>
-          <h1 className="text-2xl font-bold">Agent Portal</h1>
+          <h1 className="text-2xl font-bold text-gray-800">Agent Portal</h1>
           <p className="mt-2 text-gray-600">
             Sign in to access the customer support dashboard
           </p>
@@ -93,7 +93,7 @@ export default function AgentLogin() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-gray-700"
                 placeholder="agent@example.com"
               />
             </div>
@@ -113,7 +113,7 @@ export default function AgentLogin() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+                className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-gray-700"
               />
             </div>
           </div>

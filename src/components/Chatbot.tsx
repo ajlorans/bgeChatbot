@@ -173,6 +173,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
   const [nameError, setNameError] = useState("");
   const [showEmailInput, setShowEmailInput] = useState(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [hasInteractedWithChat, setHasInteractedWithChat] = useState(false);
 
   const {
     messages,
@@ -289,6 +290,11 @@ const Chatbot: React.FC<ChatbotProps> = ({
 
   // Handle requesting a live agent
   const handleRequestLiveAgent = async () => {
+    // If chat has ended, we shouldn't allow starting a new chat without page refresh
+    if (liveChatStatus === "ended") {
+      return;
+    }
+    
     // If we already have an email, use it directly
     if (customerEmail && validateEmail(customerEmail)) {
       await requestLiveAgent(customerEmail);
@@ -296,7 +302,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
       return;
     }
 
-    // Otherwise show the email input form
+    // Show email input form for user to enter their info
     setShowEmailInput(true);
   };
 
@@ -557,13 +563,28 @@ const Chatbot: React.FC<ChatbotProps> = ({
     };
   }, []);
 
+  // Custom toggle chat function to track interactions
+  const handleToggleChat = () => {
+    // If we're opening the chat or closing it for the first time
+    if (!isOpen || !hasInteractedWithChat) {
+      setHasInteractedWithChat(true);
+    }
+    toggleChat();
+  };
+
+  // Custom close chat function
+  const handleCloseChat = () => {
+    setHasInteractedWithChat(true);
+    closeChat();
+  };
+
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end">
       {/* Chat button - only show when chat is closed */}
       {!isOpen && (
         <>
-          {/* Chat bubble prompt - only show if showChatBubble is true */}
-          {showChatBubble && (
+          {/* Chat bubble prompt - only show if showChatBubble is true and user hasn't interacted with chat yet */}
+          {showChatBubble && !hasInteractedWithChat && (
             <div
               className="mb-2 bg-white rounded-lg shadow-md p-3 max-w-xs"
               style={{ borderColor: primaryColor, borderWidth: "1px" }}
@@ -577,7 +598,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
             </div>
           )}
           <button
-            onClick={toggleChat}
+            onClick={handleToggleChat}
             className="flex items-center justify-center w-14 h-14 rounded-full shadow-lg focus:outline-none transition-transform hover:scale-110"
             style={{ backgroundColor: primaryColor }}
             aria-label="Open chat"
@@ -600,7 +621,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
           >
             <h3 className="font-medium text-white">{botName}</h3>
             <button
-              onClick={closeChat}
+              onClick={handleCloseChat}
               className="text-white hover:text-gray-200 focus:outline-none p-2 rounded-full hover:bg-white/10 transition-colors"
               aria-label="Close chat"
             >
@@ -792,12 +813,11 @@ const Chatbot: React.FC<ChatbotProps> = ({
                   rows={1}
                 />
                 <div className="flex items-center mt-2 space-x-2">
-                  {!isLiveChat && (
+                  {!isLiveChat && liveChatStatus !== "ended" && (
                     <button
                       type="button"
                       onClick={handleRequestLiveAgent}
                       className="flex items-center px-3 py-1.5 text-sm text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
-                      disabled={isLoading}
                     >
                       <PhoneIcon className="w-4 h-4 mr-1" />
                       Speak to Agent

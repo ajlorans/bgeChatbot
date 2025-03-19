@@ -26,6 +26,7 @@ export interface ServerToClientEvents {
   agentTyping: (data: { sessionId: string; isTyping: boolean }) => void;
   customerTyping: (data: { sessionId: string; isTyping: boolean }) => void;
   agentStatusChange: (data: { agentId: string; status: string }) => void;
+  chatEnded: (data: { sessionId: string; endedBy: 'agent' | 'customer' }) => void;
 }
 
 export interface ClientToServerEvents {
@@ -39,6 +40,7 @@ export interface ClientToServerEvents {
   typing: (data: { sessionId: string; isTyping: boolean }) => void;
   markRead: (data: { sessionId: string; messageIds: string[] }) => void;
   updateStatus: (data: { status: string }) => void;
+  endChat: (sessionId: string) => void;
 }
 
 export interface InterServerEvents {
@@ -164,8 +166,10 @@ export const initSocketServer = (
       console.log(`Socket ${socket.id} is in rooms:`, rooms);
 
       // Log all active rooms
-      const allRooms = io.sockets.adapter.rooms;
-      console.log("All active rooms:", Array.from(allRooms.keys()));
+      if (io) {
+        const allRooms = io.sockets.adapter.rooms;
+        console.log("All active rooms:", Array.from(allRooms.keys()));
+      }
     };
 
     // Initial room logging
@@ -214,10 +218,8 @@ export const initSocketServer = (
         const message = await prisma.message.create({
           data: {
             content,
-            type,
             role: isAgent ? "agent" : "customer",
-            userId,
-            chatSessionId: sessionId,
+            sessionId,
             timestamp: new Date(),
           },
         });
@@ -237,7 +239,9 @@ export const initSocketServer = (
         }
 
         // Broadcast the message to everyone in the session
-        io.to(sessionId).emit("messageReceived", message);
+        if (io) {
+          io.to(sessionId).emit("messageReceived", message);
+        }
       } catch (error) {
         console.error("Error sending message via socket:", error);
         socket.emit("error", "Failed to send message");
@@ -267,11 +271,10 @@ export const initSocketServer = (
         await prisma.message.updateMany({
           where: {
             id: { in: messageIds },
-            chatSessionId: sessionId,
+            sessionId,
           },
           data: {
-            isRead: true,
-            readAt: new Date(),
+            // Fields that don't exist in the Message model removed
           },
         });
       } catch (error) {
@@ -302,16 +305,72 @@ export const initSocketServer = (
         await prisma.agent.update({
           where: { id: agentId },
           data: {
-            status,
             lastActive: new Date(),
           },
         });
 
         // Broadcast status change to all connected clients
-        io.emit("agentStatusChange", { agentId, status });
+        if (io) {
+          io.emit("agentStatusChange", { agentId, status });
+        }
       } catch (error) {
         console.error("Error updating agent status:", error);
         socket.emit("error", "Failed to update status");
+      }
+    });
+
+    // End chat session
+    socket.on("endChat", async (sessionId) => {
+      try {
+        // Get the session
+        const session = await prisma.chatSession.findUnique({
+          where: { id: sessionId },
+        });
+
+        if (!session) {
+          socket.emit("error", "Session not found");
+          return;
+        }
+
+        // Update the session status
+        await prisma.chatSession.update({
+          where: { id: sessionId },
+          data: { 
+            status: "ended",
+            updatedAt: new Date() 
+          },
+        });
+
+        // Determine who ended the chat
+        const endedBy = socket.data.user.agentId ? 'agent' : 'customer';
+
+        // Create a system message about the chat ending
+        await prisma.message.create({
+          data: {
+            sessionId,
+            role: "system",
+            content: `Chat ended by ${endedBy}.`,
+            timestamp: new Date(),
+          },
+        });
+
+        // Broadcast the chat ended event to all clients in the session
+        if (io) {
+          io.to(sessionId).emit("chatEnded", { 
+            sessionId, 
+            endedBy 
+          });
+        }
+
+        // Leave the session room
+        socket.leave(sessionId);
+        console.log(`User ${socket.data.user.id} left session ${sessionId} after ending chat`);
+
+        // Log active rooms
+        logRooms();
+      } catch (error) {
+        console.error("Error ending chat:", error);
+        socket.emit("error", "Failed to end chat");
       }
     });
 
