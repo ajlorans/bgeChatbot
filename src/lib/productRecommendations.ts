@@ -267,6 +267,266 @@ export const products: Record<string, Product> = {
     compatibleWith: ["Large"],
     relatedProducts: ["ACACIA-TABLE-LARGE", "EGG-COVER-LARGE"],
   },
+  "EGG-COVER-MINI": {
+    name: "Cover G - Fits MX and MN with or without a carrier",
+    description:
+      "Weather-resistant cover specifically designed to protect your Mini or MiniMax EGG from the elements.",
+    price: "$42.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-g-fits-mx-and-mn-with-or-without-a-carrier",
+    category: "covers",
+    compatibleWith: ["Mini", "MiniMax"],
+    relatedProducts: [],
+  },
+  "EGG-COVER-SMALL": {
+    name: "Cover F - Fits Built-Ins, Modular Nests or Cooking Islands for XL and L EGG Domes",
+    description:
+      "Weather-resistant cover specifically designed to protect your EGG dome.",
+    price: "$55.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-f-fits-built-ins-modular-nests-or-cooking-islands-for-xl-and-l-egg-domes",
+    category: "covers",
+    compatibleWith: ["Small", "Medium", "Large", "XL"],
+    relatedProducts: [],
+  },
+  "EGG-COVER-MEDIUM": {
+    name: "Cover F - Fits Built-Ins, Modular Nests or Cooking Islands for XL and L EGG Domes",
+    description:
+      "Weather-resistant cover specifically designed to protect your EGG dome.",
+    price: "$55.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-f-fits-built-ins-modular-nests-or-cooking-islands-for-xl-and-l-egg-domes",
+    category: "covers",
+    compatibleWith: ["Medium", "Large", "XL"],
+    relatedProducts: [],
+  },
+  "EGG-COVER-LARGE": {
+    name: "Cover F - Fits Built-Ins, Modular Nests or Cooking Islands for XL and L EGG Domes",
+    description:
+      "Weather-resistant cover specifically designed to protect your Large EGG dome.",
+    price: "$55.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-f-fits-built-ins-modular-nests-or-cooking-islands-for-xl-and-l-egg-domes",
+    category: "covers",
+    compatibleWith: ["Large"],
+    relatedProducts: ["TABLE-COVER-LARGE"],
+  },
+  "EGG-COVER-XL": {
+    name: "Cover F - Fits Built-Ins, Modular Nests or Cooking Islands for XL and L EGG Domes",
+    description:
+      "Weather-resistant cover specifically designed to protect your XL EGG dome.",
+    price: "$55.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-f-fits-built-ins-modular-nests-or-cooking-islands-for-xl-and-l-egg-domes",
+    category: "covers",
+    compatibleWith: ["XL"],
+    relatedProducts: [],
+  },
+  "EGG-COVER-2XL": {
+    name: "Cover F - Fits Built-Ins, Modular Nests or Cooking Islands for XL and L EGG Domes",
+    description:
+      "Weather-resistant cover specifically designed to protect your 2XL EGG dome.",
+    price: "$55.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-f-fits-built-ins-modular-nests-or-cooking-islands-for-xl-and-l-egg-domes",
+    category: "covers",
+    compatibleWith: ["2XL"],
+    relatedProducts: [],
+  },
+  "NEST-COVER-MINI": {
+    name: "Cover G - Fits MX and MN with or without a carrier",
+    description:
+      "Weather-resistant cover specifically designed to protect your Mini or MiniMax EGG with Carrier.",
+    price: "$42.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-g-fits-mx-and-mn-with-or-without-a-carrier",
+    category: "covers",
+    compatibleWith: ["Mini", "MiniMax"],
+    relatedProducts: [],
+  },
+  "NEST-COVER-SMALL": {
+    name: "Cover H - for Nest, Handler, and Portable Nest for M, S, MX",
+    description:
+      "Weather-resistant cover specifically designed to protect your Small EGG with Nest stand.",
+    price: "$74.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-h-for-nest-handler-and-portable-nest-for-m-s-mx",
+    category: "covers",
+    compatibleWith: ["Small", "Medium", "MiniMax"],
+    relatedProducts: [],
+  },
+  "NEST-COVER-MEDIUM": {
+    name: "Cover H - for Nest, Handler, and Portable Nest for M, S, MX",
+    description:
+      "Weather-resistant cover specifically designed to protect your Medium EGG with Nest stand.",
+    price: "$74.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-h-for-nest-handler-and-portable-nest-for-m-s-mx",
+    category: "covers",
+    compatibleWith: ["Medium", "Small", "MiniMax"],
+    relatedProducts: [],
+  },
+  "NEST-COVER-LARGE": {
+    name: "Cover B - Fits Nest and Handler for XL, L & Modular Nest for M",
+    description:
+      "Weather-resistant cover specifically designed to protect your Large EGG with Nest or Handler.",
+    price: "$74.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-b-fits-nest-and-handler-for-xl-l-modular-nest-for-m",
+    category: "covers",
+    compatibleWith: ["Large", "XL", "Medium"],
+    relatedProducts: [],
+  },
+  "NEST-COVER-XL": {
+    name: "Cover B - Fits Nest and Handler for XL, L & Modular Nest for M",
+    description:
+      "Weather-resistant cover specifically designed to protect your XL EGG with Nest or Handler.",
+    price: "$74.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-b-fits-nest-and-handler-for-xl-l-modular-nest-for-m",
+    category: "covers",
+    compatibleWith: ["XL", "Large", "Medium"],
+    relatedProducts: [],
+  },
+  "NEST-COVER-2XL": {
+    name: "Cover I - Fits Nest and Handler or Nest for 2XL",
+    description:
+      "Weather-resistant cover specifically designed to protect your 2XL EGG with Nest stand.",
+    price: "$74.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-i-fits-nest-and-handler-or-nest-for-2xl",
+    category: "covers",
+    compatibleWith: ["2XL"],
+    relatedProducts: [],
+  },
+  "MODULAR-COVER-LARGE": {
+    name: "Cover A - Fits Modular Nest for 2XL, XL and L",
+    description:
+      "Weather-resistant cover specifically designed to protect your Large EGG with Modular Nest.",
+    price: "$79.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-a-fits-modular-nest-for-2xl-xl-and-l",
+    category: "covers",
+    compatibleWith: ["Large", "XL", "2XL"],
+    relatedProducts: [],
+  },
+  "MODULAR-COVER-XL": {
+    name: "Cover A - Fits Modular Nest for 2XL, XL and L",
+    description:
+      "Weather-resistant cover specifically designed to protect your XL EGG with Modular Nest.",
+    price: "$79.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-a-fits-modular-nest-for-2xl-xl-and-l",
+    category: "covers",
+    compatibleWith: ["XL", "Large", "2XL"],
+    relatedProducts: [],
+  },
+  "MODULAR-COVER-2XL": {
+    name: "Cover A - Fits Modular Nest for 2XL, XL and L",
+    description:
+      "Weather-resistant cover specifically designed to protect your 2XL EGG with Modular Nest.",
+    price: "$79.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-a-fits-modular-nest-for-2xl-xl-and-l",
+    category: "covers",
+    compatibleWith: ["2XL", "XL", "Large"],
+    relatedProducts: [],
+  },
+  "EXPANSION-COVER-MEDIUM": {
+    name: "Cover C - Fits Modular Nest + Expansion Frame for XL, L and M, Acacia Table for XL",
+    description:
+      "Weather-resistant cover specifically designed to protect your Medium EGG with Modular Nest and Expansion Frame.",
+    price: "$92.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-c-fits-modular-nest-expansion-frame-for-xl-l-and-m-acacia-table-for-xl",
+    category: "covers",
+    compatibleWith: ["Medium", "Large", "XL"],
+    relatedProducts: [],
+  },
+  "EXPANSION-COVER-LARGE": {
+    name: "Cover C - Fits Modular Nest + Expansion Frame for XL, L and M, Acacia Table for XL",
+    description:
+      "Weather-resistant cover specifically designed to protect your Large EGG with Modular Nest and Expansion Frame.",
+    price: "$92.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-c-fits-modular-nest-expansion-frame-for-xl-l-and-m-acacia-table-for-xl",
+    category: "covers",
+    compatibleWith: ["Large", "Medium", "XL"],
+    relatedProducts: [],
+  },
+  "EXPANSION-COVER-XL": {
+    name: "Cover C - Fits Modular Nest + Expansion Frame for XL, L and M, Acacia Table for XL",
+    description:
+      "Weather-resistant cover specifically designed to protect your XL EGG with Modular Nest and Expansion Frame or Acacia Table.",
+    price: "$92.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-c-fits-modular-nest-expansion-frame-for-xl-l-and-m-acacia-table-for-xl",
+    category: "covers",
+    compatibleWith: ["XL", "Large", "Medium"],
+    relatedProducts: [],
+  },
+  "COOKING-ISLAND-COVER-LARGE": {
+    name: "Cover D - Fits 49\" Cooking Island for XL and L",
+    description:
+      "Weather-resistant cover specifically designed to protect your Large EGG with 49\" Cooking Island.",
+    price: "$82.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-d-fits-49-cooking-island-for-xl-and-l",
+    category: "covers",
+    compatibleWith: ["Large", "XL"],
+    relatedProducts: [],
+  },
+  "COOKING-ISLAND-COVER-XL": {
+    name: "Cover D - Fits 49\" Cooking Island for XL and L",
+    description:
+      "Weather-resistant cover specifically designed to protect your XL EGG with 49\" Cooking Island.",
+    price: "$82.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-d-fits-49-cooking-island-for-xl-and-l",
+    category: "covers",
+    compatibleWith: ["XL", "Large"],
+    relatedProducts: [],
+  },
+  "MODERN-TABLE-COVER-LARGE-53": {
+    name: "Cover K - L and XL for 53\" Modern Table",
+    description:
+      "Weather-resistant cover specifically designed to protect your Large EGG with 53\" Modern Table.",
+    price: "$99.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-k-l-and-xl-for-53-modern-table",
+    category: "covers",
+    compatibleWith: ["Large", "XL"],
+    relatedProducts: [],
+  },
+  "MODERN-TABLE-COVER-XL-53": {
+    name: "Cover K - L and XL for 53\" Modern Table",
+    description:
+      "Weather-resistant cover specifically designed to protect your XL EGG with 53\" Modern Table.",
+    price: "$99.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-k-l-and-xl-for-53-modern-table",
+    category: "covers",
+    compatibleWith: ["XL", "Large"],
+    relatedProducts: [],
+  },
+  "MODERN-TABLE-COVER-LARGE-72": {
+    name: "Cover L - L and XL for 72\" Modern Table",
+    description:
+      "Weather-resistant cover specifically designed to protect your Large EGG with 72\" Modern Table.",
+    price: "$109.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-l-l-and-xl-for-72-modern-table",
+    category: "covers",
+    compatibleWith: ["Large", "XL"],
+    relatedProducts: [],
+  },
+  "MODERN-TABLE-COVER-XL-72": {
+    name: "Cover L - L and XL for 72\" Modern Table",
+    description:
+      "Weather-resistant cover specifically designed to protect your XL EGG with 72\" Modern Table.",
+    price: "$109.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-l-l-and-xl-for-72-modern-table",
+    category: "covers",
+    compatibleWith: ["XL", "Large"],
+    relatedProducts: [],
+  },
+  "COOKING-ISLAND-COVER-LARGE-76": {
+    name: "Cover J - Fits 76\" Cooking Island for XL and L",
+    description:
+      "Weather-resistant cover specifically designed to protect your Large EGG with 76\" Cooking Island.",
+    price: "$109.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-j-fits-76-cooking-island-for-xl-and-l",
+    category: "covers",
+    compatibleWith: ["Large", "XL"],
+    relatedProducts: [],
+  },
+  "COOKING-ISLAND-COVER-XL-76": {
+    name: "Cover J - Fits 76\" Cooking Island for XL and L",
+    description:
+      "Weather-resistant cover specifically designed to protect your XL EGG with 76\" Cooking Island.",
+    price: "$109.99",
+    url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-j-fits-76-cooking-island-for-xl-and-l",
+    category: "covers",
+    compatibleWith: ["XL", "Large"],
+    relatedProducts: [],
+  },
 };
 
 // Product bundles
@@ -361,6 +621,197 @@ export const eggSizeRecommendations: Record<string, EggSizeRecommendation> = {
 export function getProductRecommendations(query: string): Product[] {
   const lowerQuery = query.toLowerCase();
   const recommendations: Product[] = [];
+
+  // Special case for direct cover queries
+  if (lowerQuery.includes("cover")) {
+    // Special case for table covers
+    if ((lowerQuery.includes("large") && lowerQuery.includes("acacia")) || 
+        (lowerQuery.includes("large") && lowerQuery.includes("table"))) {
+      recommendations.push(products["TABLE-COVER-LARGE"]);
+      return recommendations;
+    }
+    
+    // Special case for nest/stand covers
+    if (lowerQuery.includes("large") && (lowerQuery.includes("nest") || lowerQuery.includes("stand"))) {
+      recommendations.push(products["NEST-COVER-LARGE"]);
+      return recommendations;
+    }
+    if (lowerQuery.includes("xl") && (lowerQuery.includes("nest") || lowerQuery.includes("stand"))) {
+      recommendations.push(products["NEST-COVER-XL"]);
+      return recommendations;
+    }
+    if (lowerQuery.includes("2xl") && (lowerQuery.includes("nest") || lowerQuery.includes("stand"))) {
+      recommendations.push(products["NEST-COVER-2XL"]);
+      return recommendations;
+    }
+    if (lowerQuery.includes("medium") && (lowerQuery.includes("nest") || lowerQuery.includes("stand"))) {
+      recommendations.push(products["NEST-COVER-MEDIUM"]);
+      return recommendations;
+    }
+    if (lowerQuery.includes("small") && (lowerQuery.includes("nest") || lowerQuery.includes("stand"))) {
+      recommendations.push(products["NEST-COVER-SMALL"]);
+      return recommendations;
+    }
+    if ((lowerQuery.includes("mini") || lowerQuery.includes("minimax")) && 
+        (lowerQuery.includes("nest") || lowerQuery.includes("stand") || lowerQuery.includes("carrier"))) {
+      recommendations.push(products["NEST-COVER-MINI"]);
+      return recommendations;
+    }
+    
+    // Special case for modular covers
+    if (lowerQuery.includes("modular") && lowerQuery.includes("expansion")) {
+      if (lowerQuery.includes("xl")) {
+        recommendations.push(products["EXPANSION-COVER-XL"]);
+        return recommendations;
+      } else if (lowerQuery.includes("large")) {
+        recommendations.push(products["EXPANSION-COVER-LARGE"]);
+        return recommendations;
+      } else if (lowerQuery.includes("medium")) {
+        recommendations.push(products["EXPANSION-COVER-MEDIUM"]);
+        return recommendations;
+      }
+    }
+    
+    if (lowerQuery.includes("modular")) {
+      if (lowerQuery.includes("2xl")) {
+        recommendations.push(products["MODULAR-COVER-2XL"]);
+        return recommendations;
+      } else if (lowerQuery.includes("xl")) {
+        recommendations.push(products["MODULAR-COVER-XL"]);
+        return recommendations;
+      } else if (lowerQuery.includes("large")) {
+        recommendations.push(products["MODULAR-COVER-LARGE"]);
+        return recommendations;
+      }
+    }
+    
+    // Special case for modern table covers
+    if (lowerQuery.includes("modern") && lowerQuery.includes("53")) {
+      if (lowerQuery.includes("xl")) {
+        recommendations.push(products["MODERN-TABLE-COVER-XL-53"]);
+        return recommendations;
+      } else if (lowerQuery.includes("large")) {
+        recommendations.push(products["MODERN-TABLE-COVER-LARGE-53"]);
+        return recommendations;
+      }
+    }
+    
+    if (lowerQuery.includes("modern") && lowerQuery.includes("72")) {
+      if (lowerQuery.includes("xl")) {
+        recommendations.push(products["MODERN-TABLE-COVER-XL-72"]);
+        return recommendations;
+      } else if (lowerQuery.includes("large")) {
+        recommendations.push(products["MODERN-TABLE-COVER-LARGE-72"]);
+        return recommendations;
+      }
+    }
+    
+    // Special case for cooking island covers
+    if (lowerQuery.includes("cooking") && lowerQuery.includes("island") && lowerQuery.includes("49")) {
+      if (lowerQuery.includes("xl")) {
+        recommendations.push(products["COOKING-ISLAND-COVER-XL"]);
+        return recommendations;
+      } else if (lowerQuery.includes("large")) {
+        recommendations.push(products["COOKING-ISLAND-COVER-LARGE"]);
+        return recommendations;
+      }
+    }
+    
+    if (lowerQuery.includes("cooking") && lowerQuery.includes("island") && lowerQuery.includes("76")) {
+      if (lowerQuery.includes("xl")) {
+        recommendations.push(products["COOKING-ISLAND-COVER-XL-76"]);
+        return recommendations;
+      } else if (lowerQuery.includes("large")) {
+        recommendations.push(products["COOKING-ISLAND-COVER-LARGE-76"]);
+        return recommendations;
+      }
+    }
+    
+    // General cover request with size
+    if (lowerQuery.includes("2xl") || lowerQuery.includes("xxl") || lowerQuery.includes("2x")) {
+      recommendations.push(products["EGG-COVER-2XL"]);
+      return recommendations;
+    } else if (lowerQuery.includes("xl") || lowerQuery.includes("extra large")) {
+      recommendations.push(products["EGG-COVER-XL"]);
+      return recommendations;
+    } else if (lowerQuery.includes("large")) {
+      recommendations.push(products["EGG-COVER-LARGE"]);
+      return recommendations;
+    } else if (lowerQuery.includes("medium")) {
+      recommendations.push(products["EGG-COVER-MEDIUM"]);
+      return recommendations;
+    } else if (lowerQuery.includes("small")) {
+      recommendations.push(products["EGG-COVER-SMALL"]);
+      return recommendations;
+    } else if (lowerQuery.includes("minimax") || lowerQuery.includes("mini max") || lowerQuery.includes("mini")) {
+      recommendations.push(products["EGG-COVER-MINI"]);
+      return recommendations;
+    }
+    
+    // Cover request with no size specified - default to all options or a message
+    if (lowerQuery === "cover" || 
+        lowerQuery === "i need a cover" || 
+        lowerQuery === "can you give me a cover" ||
+        lowerQuery.includes("need cover") ||
+        lowerQuery.includes("want cover") ||
+        (lowerQuery.includes("cover") && 
+         (lowerQuery.includes("egg") || lowerQuery.includes("bge") || lowerQuery.includes("big green egg")))) {
+      // Depends on context - in this case, let's provide the 2XL cover as default from example
+      recommendations.push(products["EGG-COVER-2XL"]);
+      return recommendations;
+    }
+  }
+
+  // Check for cover requests specifically
+  if (lowerQuery.includes("cover") && 
+      (lowerQuery.includes("egg") || 
+       lowerQuery.includes("bge") || 
+       lowerQuery.includes("big green egg") ||
+       lowerQuery === "cover" ||
+       lowerQuery === "i need a cover" ||
+       lowerQuery === "can you give me a cover")) {
+    
+    // Try to determine size
+    let mappedSize = "";
+    if (lowerQuery.includes("minimax") || lowerQuery.includes("mini max") || lowerQuery.includes("mini-max")) {
+      mappedSize = "MINI";
+    } else if (lowerQuery.includes("mini")) {
+      mappedSize = "MINI";
+    } else if (lowerQuery.includes("small")) {
+      mappedSize = "SMALL";
+    } else if (lowerQuery.includes("medium")) {
+      mappedSize = "MEDIUM";
+    } else if (lowerQuery.includes("large")) {
+      mappedSize = "LARGE";
+    } else if (lowerQuery.includes("xl") || lowerQuery.includes("extra large")) {
+      mappedSize = "XL";
+    } else if (lowerQuery.includes("2xl") || lowerQuery.includes("xxl") || lowerQuery.includes("2x")) {
+      mappedSize = "2XL";
+    } else {
+      // Default to 2XL if they previously mentioned it
+      mappedSize = "2XL";
+    }
+    
+    // Try to determine configuration
+    if (lowerQuery.includes("table") || lowerQuery.includes("acacia")) {
+      if (mappedSize === "LARGE") {
+        recommendations.push(products["TABLE-COVER-LARGE"]);
+      } else {
+        // Use standalone cover for other sizes
+        recommendations.push(products[`EGG-COVER-${mappedSize}`]);
+      }
+    } else if (lowerQuery.includes("nest") || lowerQuery.includes("stand")) {
+      recommendations.push(products[`NEST-COVER-${mappedSize}`]);
+    } else {
+      // Default to standalone cover
+      recommendations.push(products[`EGG-COVER-${mappedSize}`]);
+    }
+    
+    // If we found recommendations, return them
+    if (recommendations.length > 0) {
+      return recommendations;
+    }
+  }
 
   // Check for specific product categories
   if (lowerQuery.includes("pizza")) {
@@ -650,4 +1101,154 @@ export function isProductSelectionQuery(query: string): boolean {
     lowerQuery.includes("difference between") ||
     (lowerQuery.includes("size") && lowerQuery.includes("family"))
   );
+}
+
+// Function to recommend a cover based on EGG size and configuration
+export function recommendEggCover(eggSize: string, configuration: string): Product[] {
+  const recommendations: Product[] = [];
+  const size = eggSize.toLowerCase();
+  const config = configuration.toLowerCase();
+  
+  // Map user input to actual EGG sizes
+  let mappedSize = "";
+  if (size.includes("minimax") || size.includes("mini max") || size.includes("mini-max")) {
+    mappedSize = "MINI";
+  } else if (size.includes("mini")) {
+    mappedSize = "MINI";
+  } else if (size.includes("small")) {
+    mappedSize = "SMALL";
+  } else if (size.includes("medium")) {
+    mappedSize = "MEDIUM";
+  } else if (size.includes("large")) {
+    mappedSize = "LARGE";
+  } else if (size.includes("xl") || size.includes("extra large")) {
+    mappedSize = "XL";
+  } else if (size.includes("2xl") || size.includes("xxl") || size.includes("2x")) {
+    mappedSize = "2XL";
+  } else {
+    // Default to Large if size is unclear
+    mappedSize = "LARGE";
+  }
+  
+  // Recommend cover based on configuration and size
+  if (config.includes("acacia table") || (config.includes("table") && config.includes("acacia"))) {
+    if (mappedSize === "LARGE") {
+      recommendations.push(products["TABLE-COVER-LARGE"]);
+    } else if (mappedSize === "XL") {
+      recommendations.push(products["EXPANSION-COVER-XL"]);
+    } else {
+      // For other sizes, no specific acacia table cover
+      recommendations.push(products[`EGG-COVER-${mappedSize}`]);
+    }
+  } else if (config.includes("modern table") || config.includes("modern 53")) {
+    if (mappedSize === "LARGE") {
+      recommendations.push(products["MODERN-TABLE-COVER-LARGE-53"]);
+    } else if (mappedSize === "XL") {
+      recommendations.push(products["MODERN-TABLE-COVER-XL-53"]);
+    } else {
+      // For other sizes, no specific covers
+      recommendations.push(products[`EGG-COVER-${mappedSize}`]);
+    }
+  } else if (config.includes("modern 72")) {
+    if (mappedSize === "LARGE") {
+      recommendations.push(products["MODERN-TABLE-COVER-LARGE-72"]);
+    } else if (mappedSize === "XL") {
+      recommendations.push(products["MODERN-TABLE-COVER-XL-72"]);
+    } else {
+      // For other sizes, no specific covers
+      recommendations.push(products[`EGG-COVER-${mappedSize}`]);
+    }
+  } else if (config.includes("cooking island 49")) {
+    if (mappedSize === "LARGE" || mappedSize === "XL") {
+      recommendations.push(products["COOKING-ISLAND-COVER-" + mappedSize]);
+    } else {
+      // For other sizes, no specific covers
+      recommendations.push(products[`EGG-COVER-${mappedSize}`]);
+    }
+  } else if (config.includes("cooking island 76")) {
+    if (mappedSize === "LARGE" || mappedSize === "XL") {
+      recommendations.push(products["COOKING-ISLAND-COVER-" + mappedSize + "-76"]);
+    } else {
+      // For other sizes, no specific covers
+      recommendations.push(products[`EGG-COVER-${mappedSize}`]);
+    }
+  } else if (config.includes("modular") && config.includes("expansion")) {
+    if (mappedSize === "MEDIUM" || mappedSize === "LARGE" || mappedSize === "XL") {
+      recommendations.push(products["EXPANSION-COVER-" + mappedSize]);
+    } else {
+      // For other sizes, no specific covers
+      recommendations.push(products[`EGG-COVER-${mappedSize}`]);
+    }
+  } else if (config.includes("modular")) {
+    if (mappedSize === "2XL" || mappedSize === "XL" || mappedSize === "LARGE") {
+      recommendations.push(products["MODULAR-COVER-" + mappedSize]);
+    } else if (mappedSize === "MEDIUM") {
+      recommendations.push(products["NEST-COVER-MEDIUM"]);
+    } else {
+      // For other sizes, no specific covers
+      recommendations.push(products[`EGG-COVER-${mappedSize}`]);
+    }
+  } else if (config.includes("nest") || config.includes("stand") || config.includes("handler")) {
+    recommendations.push(products[`NEST-COVER-${mappedSize}`]);
+  } else if (config.includes("built-in") || config.includes("builtin")) {
+    recommendations.push(products[`EGG-COVER-${mappedSize}`]);
+  } else if (config.includes("dome") || config.includes("top")) {
+    recommendations.push(products[`EGG-COVER-${mappedSize}`]);
+  } else {
+    // Default standalone EGG
+    if (mappedSize === "MINI" || mappedSize === "MINIMAX") {
+      recommendations.push(products["EGG-COVER-MINI"]);
+    } else {
+      recommendations.push(products[`EGG-COVER-${mappedSize}`]);
+    }
+  }
+  
+  return recommendations;
+}
+
+// Function to check if a query is asking about EGG covers
+export function isEggCoverQuery(query: string): boolean {
+  const lowerQuery = query.toLowerCase();
+  
+  // Check for direct cover queries
+  const hasCoverTerm = lowerQuery.includes("cover") || 
+                        lowerQuery.includes("covering") || 
+                        lowerQuery.includes("protection") ||
+                        lowerQuery.includes("protect");
+  
+  // Check for EGG related terms
+  const hasEggTerm = lowerQuery.includes("egg") || 
+                     lowerQuery.includes("bge") || 
+                     lowerQuery.includes("big green egg") ||
+                     lowerQuery.includes("grill");
+                     
+  // Check for standalone cover requests
+  const isStandaloneCoverRequest = lowerQuery === "cover" ||
+                                   lowerQuery === "i need a cover" ||
+                                   lowerQuery === "can you give me a cover" ||
+                                   lowerQuery.startsWith("cover for");
+  
+  return (hasCoverTerm && hasEggTerm) || isStandaloneCoverRequest;
+}
+
+// Function to generate an EGG cover recommendation message
+export function generateEggCoverRecommendationMessage(
+  products: Product[],
+  eggSize: string,
+  configuration: string
+): string {
+  if (products.length === 0) {
+    return "I don't have specific cover recommendations for that configuration. Could you provide more details about your Big Green Egg size and setup (table, nest, or standalone)?";
+  }
+
+  let message = `Based on your ${eggSize} EGG in a ${configuration} configuration, I recommend the following cover:\n\n`;
+
+  products.forEach((product) => {
+    message += `• **[${product.name}](${product.url})** - ${product.price}\n  ${product.description}\n\n`;
+  });
+
+  message +=
+    "This cover is specially designed to protect your EGG from weather elements like rain, sun, and dust. Would you like information about any other accessories for your Big Green Egg?";
+
+  return message;
 }

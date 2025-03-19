@@ -3,21 +3,24 @@ import OpenAI from "openai";
 import { createMessage, defaultSystemPrompt } from "@/lib/utils";
 import { Message } from "@/lib/types";
 import {
-  getProductRecommendations,
-  getProductBundles,
-  recommendEggSize,
   generateProductRecommendationMessage,
   generateBundleRecommendationMessage,
   generateEggSizeRecommendationMessage,
   generateGuidedSelectionMessage,
+  getProductRecommendations,
+  getProductBundles,
+  recommendEggSize,
   isProductSelectionQuery,
   eggSizeRecommendations,
+  recommendEggCover,
+  generateEggCoverRecommendationMessage,
+  isEggCoverQuery,
+  products
 } from "@/lib/productRecommendations";
 import { handleRecipeRequest } from "@/lib/recipeHandler";
 import { getAllowedOrigins, corsConfig } from "@/config/cors";
 import { searchFAQs, generateFAQResponse } from "@/lib/faqData";
 import { searchProducts, generateProductResponse } from "@/lib/productDatabase";
-import { createLiveChatSession } from "@/lib/liveChatSession";
 import { v4 as uuidv4 } from "uuid";
 
 // Add to top after imports
@@ -384,6 +387,30 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Check for recipe requests
+    // This should come before product recommendations and other features
+    const recipeContent = lastMessage.content.toLowerCase();
+    const isRecipeQuery = 
+      recipeContent.includes("recipe") || 
+      recipeContent.includes("how to cook") || 
+      recipeContent.includes("how to make") || 
+      recipeContent.includes("how do i make") ||
+      recipeContent.includes("cooking") || 
+      (recipeContent.includes("grill") && recipeContent.includes("on")) ||
+      (recipeContent.includes("smoke") && recipeContent.includes("on")) ||
+      (recipeContent.includes("bake") && recipeContent.includes("on"));
+
+    if (isRecipeQuery) {
+      console.log("Detected recipe request, handling with recipe handler");
+      try {
+        const recipeResponse = await handleRecipeRequest(openai, lastMessage.content, messages);
+        return NextResponse.json(recipeResponse);
+      } catch (error) {
+        console.error("Error handling recipe request:", error);
+        // If there's an error in recipe handling, continue with the next checks
+      }
+    }
+
     // Check for product category inquiries
     const lowerMessage = lastMessage.content.toLowerCase();
     let productMessage = "";
@@ -698,6 +725,162 @@ export async function POST(req: NextRequest) {
 
     // Check for product recommendation queries
     if (isProductRecommendation(lastMessage.content)) {
+      // Special case for "Cover for a large acacia" type queries
+      const lowerMessageContent = lastMessage.content.toLowerCase();
+      if ((lowerMessageContent.includes("cover") && lowerMessageContent.includes("large") && lowerMessageContent.includes("acacia")) || 
+          (lowerMessageContent.includes("cover") && lowerMessageContent.includes("large") && lowerMessageContent.includes("table"))) {
+        
+        const tableRecommendations = [products["TABLE-COVER-LARGE"]];
+        const tableMessage = 
+          "Based on your Large EGG in a table configuration, I recommend the following cover:\n\n" +
+          `• **[${products["TABLE-COVER-LARGE"].name}](${products["TABLE-COVER-LARGE"].url})** - ${products["TABLE-COVER-LARGE"].price}\n` +
+          `  ${products["TABLE-COVER-LARGE"].description}\n\n` +
+          "This cover is specially designed to protect your EGG and table from weather elements like rain, sun, and dust. Would you like information about any other accessories for your Big Green Egg?";
+          
+        return NextResponse.json({
+          messages: [createMessage("assistant", tableMessage)],
+          category: "product_recommendation",
+        });
+      } else if ((lowerMessageContent.includes("cover") && lowerMessageContent.includes("large") && lowerMessageContent.includes("nest")) || 
+                (lowerMessageContent.includes("cover") && lowerMessageContent.includes("large") && lowerMessageContent.includes("stand"))) {
+        
+        const nestRecommendations = [products["NEST-COVER-LARGE"]];
+        const nestMessage = 
+          "Based on your Large EGG with a nest stand configuration, I recommend the following cover:\n\n" +
+          `• **[${products["NEST-COVER-LARGE"].name}](${products["NEST-COVER-LARGE"].url})** - ${products["NEST-COVER-LARGE"].price}\n` +
+          `  ${products["NEST-COVER-LARGE"].description}\n\n` +
+          "This cover is specially designed to protect your EGG on the nest stand from weather elements like rain, sun, and dust. Would you like information about any other accessories for your Big Green Egg?";
+          
+        return NextResponse.json({
+          messages: [createMessage("assistant", nestMessage)],
+          category: "product_recommendation",
+        });
+      } else if ((lowerMessageContent.includes("cover") && lowerMessageContent.includes("xl") && lowerMessageContent.includes("nest")) || 
+                (lowerMessageContent.includes("cover") && lowerMessageContent.includes("xl") && lowerMessageContent.includes("stand"))) {
+        
+        const nestRecommendations = [products["NEST-COVER-XL"]];
+        const nestMessage = 
+          "Based on your XL EGG with a nest stand configuration, I recommend the following cover:\n\n" +
+          `• **[${products["NEST-COVER-XL"].name}](${products["NEST-COVER-XL"].url})** - ${products["NEST-COVER-XL"].price}\n` +
+          `  ${products["NEST-COVER-XL"].description}\n\n` +
+          "This cover is specially designed to protect your EGG on the nest stand from weather elements like rain, sun, and dust. Would you like information about any other accessories for your Big Green Egg?";
+          
+        return NextResponse.json({
+          messages: [createMessage("assistant", nestMessage)],
+          category: "product_recommendation",
+        });
+      } else if ((lowerMessageContent.includes("cover") && lowerMessageContent.includes("2xl") && lowerMessageContent.includes("nest")) || 
+                (lowerMessageContent.includes("cover") && lowerMessageContent.includes("2xl") && lowerMessageContent.includes("stand"))) {
+        
+        const nestRecommendations = [products["NEST-COVER-2XL"]];
+        const nestMessage = 
+          "Based on your 2XL EGG with a nest stand configuration, I recommend the following cover:\n\n" +
+          `• **[${products["NEST-COVER-2XL"].name}](${products["NEST-COVER-2XL"].url})** - ${products["NEST-COVER-2XL"].price}\n` +
+          `  ${products["NEST-COVER-2XL"].description}\n\n` +
+          "This cover is specially designed to protect your EGG on the nest stand from weather elements like rain, sun, and dust. Would you like information about any other accessories for your Big Green Egg?";
+          
+        return NextResponse.json({
+          messages: [createMessage("assistant", nestMessage)],
+          category: "product_recommendation",
+        });
+      }
+      
+      // Check if the user is asking about EGG covers
+      if (isEggCoverQuery(lastMessage.content)) {
+        console.log("User is asking about EGG covers");
+        
+        // Initialize variables to track EGG size and configuration
+        let eggSize = "";
+        let configuration = "";
+        
+        // Check the message for size information
+        const lowerMessageContent = lastMessage.content.toLowerCase();
+        if (lowerMessageContent.includes("minimax") || lowerMessageContent.includes("mini max") || lowerMessageContent.includes("mini-max")) {
+          eggSize = "MiniMax";
+        } else if (lowerMessageContent.includes("mini")) {
+          eggSize = "Mini";
+        } else if (lowerMessageContent.includes("small")) {
+          eggSize = "Small";
+        } else if (lowerMessageContent.includes("medium")) {
+          eggSize = "Medium";
+        } else if (lowerMessageContent.includes("large")) {
+          eggSize = "Large";
+        } else if (lowerMessageContent.includes("xl") || lowerMessageContent.includes("extra large")) {
+          eggSize = "XL";
+        } else if (lowerMessageContent.includes("2xl") || lowerMessageContent.includes("xxl") || lowerMessageContent.includes("2x")) {
+          eggSize = "2XL";
+        }
+        
+        // Check the message for configuration information
+        if (lowerMessageContent.includes("table") || lowerMessageContent.includes("acacia")) {
+          configuration = "table";
+        } else if (lowerMessageContent.includes("nest") || lowerMessageContent.includes("stand")) {
+          configuration = "nest stand";
+        } else if (lowerMessageContent.includes("standalone") || lowerMessageContent.includes("alone")) {
+          configuration = "standalone";
+        }
+        
+        // If we have size and configuration, provide recommendation
+        if (eggSize && configuration) {
+          const coverRecommendations = recommendEggCover(eggSize, configuration);
+          const coverMessage = generateEggCoverRecommendationMessage(
+            coverRecommendations,
+            eggSize,
+            configuration
+          );
+          
+          return NextResponse.json({
+            messages: [createMessage("assistant", coverMessage)],
+            category: "product_recommendation",
+          });
+        }
+        
+        // If we're missing information, ask follow-up questions
+        if (!eggSize && !configuration) {
+          const coverInquiryMessage = 
+            "I'd be happy to help you find the perfect cover for your Big Green Egg! To recommend the right cover, I need to know:\n\n" +
+            "1. What size is your EGG? (Mini, MiniMax, Small, Medium, Large, XL, or 2XL)\n\n" +
+            "2. How is your EGG set up?\n" +
+            "   • In an Acacia or other table\n" +
+            "   • On a nest stand\n" +
+            "   • Standalone\n\n" +
+            "This will help me recommend the perfect cover to protect your investment from the elements.";
+            
+          return NextResponse.json({
+            messages: [createMessage("assistant", coverInquiryMessage)],
+            category: "product_recommendation",
+          });
+        } else if (!eggSize) {
+          const sizeInquiryMessage = 
+            `I'd be happy to help you find the perfect cover for your Big Green Egg in a ${configuration} setup! To recommend the right cover, I just need to know what size your EGG is:\n\n` +
+            "• Mini\n" +
+            "• MiniMax\n" +
+            "• Small\n" +
+            "• Medium\n" +
+            "• Large\n" +
+            "• XL\n" +
+            "• 2XL\n\n" +
+            "Once I know the size, I can recommend the perfect cover for your setup.";
+            
+          return NextResponse.json({
+            messages: [createMessage("assistant", sizeInquiryMessage)],
+            category: "product_recommendation",
+          });
+        } else if (!configuration) {
+          const configInquiryMessage = 
+            `I'd be happy to help you find the perfect cover for your ${eggSize} Big Green Egg! To recommend the right cover, I just need to know how your EGG is set up:\n\n` +
+            "• In an Acacia or other table\n" +
+            "• On a nest stand\n" +
+            "• Standalone\n\n" +
+            "This will help me recommend the perfect cover to protect your investment from the elements.";
+            
+          return NextResponse.json({
+            messages: [createMessage("assistant", configInquiryMessage)],
+            category: "product_recommendation",
+          });
+        }
+      }
+      
       // Check if the user is specifically asking about accessories
       if (
         lowerMessage.includes("accessories") ||
@@ -815,418 +998,6 @@ export async function POST(req: NextRequest) {
             messages: [createMessage("assistant", accessoryMessage)],
             category: "product_recommendation",
           });
-        }
-
-        // Ask which size EGG they have to provide appropriate accessories
-        const accessoryInquiryMessage =
-          "I'd be happy to recommend accessories for your Big Green Egg! To provide the most appropriate recommendations, could you tell me which size EGG you have?\n\n" +
-          "• Mini\n" +
-          "• MiniMax\n" +
-          "• Small\n" +
-          "• Medium\n" +
-          "• Large\n" +
-          "• XL\n" +
-          "• 2XL\n\n" +
-          "If you don't have an EGG yet and are looking for accessories to go with a new purchase, let me know and I can help you choose both the right size and the perfect accessories for your needs.";
-
-        return NextResponse.json({
-          messages: [createMessage("assistant", accessoryInquiryMessage)],
-          category: "product_recommendation",
-        });
-      }
-
-      // Get product recommendations based on the user's query
-      const recommendedProducts = getProductRecommendations(
-        lastMessage.content
-      );
-      const recommendedBundles = getProductBundles(lastMessage.content);
-
-      let responseMessage = "";
-
-      // If the user is asking about egg sizes, provide a size recommendation
-      if (isProductSelectionQuery(lastMessage.content)) {
-        const sizeRecommendation = recommendEggSize(lastMessage.content);
-        if (!sizeRecommendation) {
-          // Customize the initial product recommendation prompt
-          responseMessage =
-            "To help you find the perfect Big Green Egg size or accessories, could you tell me:\n\n" +
-            "• How many people do you typically cook for?\n\n" +
-            "• Do you entertain frequently?\n\n" +
-            "• How much outdoor space do you have?\n\n" +
-            "• Do you need portability (for camping, tailgating, etc.)?\n\n" +
-            "If you're looking for accessories instead, please let me know which size EGG you have, and I can recommend the perfect accessories for your needs.";
-        } else {
-          responseMessage =
-            generateEggSizeRecommendationMessage(sizeRecommendation);
-        }
-      }
-      // If the user is asking for general product guidance, provide a guided selection flow
-      else if (isGuidedSelectionQuery(lastMessage.content)) {
-        responseMessage = generateGuidedSelectionMessage();
-      }
-      // Otherwise, provide product recommendations
-      else {
-        responseMessage = generateProductRecommendationMessage(
-          recommendedProducts,
-          lastMessage.content
-        );
-
-        // Add bundle recommendations if available
-        const bundleMessage =
-          generateBundleRecommendationMessage(recommendedBundles);
-        if (bundleMessage) {
-          responseMessage += "\n\n" + bundleMessage;
-        }
-      }
-
-      return NextResponse.json({
-        messages: [createMessage("assistant", responseMessage)],
-        category: "product_recommendation",
-      });
-    }
-
-    // Check for assembly guide inquiries
-    if (
-      (lowerMessage.includes("assembly") &&
-        (lowerMessage.includes("guide") ||
-          lowerMessage.includes("instruction") ||
-          lowerMessage.includes("manual") ||
-          lowerMessage.includes("help"))) ||
-      (lowerMessage.includes("assemble") && lowerMessage.includes("egg")) ||
-      (lowerMessage.includes("put together") && lowerMessage.includes("egg")) ||
-      (lowerMessage.includes("putting together") &&
-        lowerMessage.includes("egg")) ||
-      (lowerMessage.includes("build") && lowerMessage.includes("egg")) ||
-      (lowerMessage.includes("setup") && lowerMessage.includes("egg")) ||
-      (lowerMessage.includes("set up") && lowerMessage.includes("egg")) ||
-      (lowerMessage.includes("install") && lowerMessage.includes("egg")) ||
-      (lowerMessage.includes("installation") && lowerMessage.includes("egg")) ||
-      (lowerMessage.includes("white glove") &&
-        lowerMessage.includes("delivery")) ||
-      lowerMessage.includes("gasket replacement") ||
-      (lowerMessage.includes("help") &&
-        lowerMessage.includes("assembling") &&
-        lowerMessage.includes("egg")) ||
-      (lowerMessage.includes("need help") &&
-        lowerMessage.includes("assembly") &&
-        lowerMessage.includes("egg"))
-    ) {
-      isAssemblyInquiry = true;
-      let assemblyMessage =
-        "We have comprehensive assembly guides for all Big Green Egg products at our [Assembly Guides page](https://biggreenegg.com/blogs/guides/assembly). ";
-
-      // Specific EGG size assembly
-      if (
-        lowerMessage.includes("2xl") ||
-        lowerMessage.includes("2 xl") ||
-        lowerMessage.includes("xxl")
-      ) {
-        assemblyMessage +=
-          "For your 2XL EGG, we have specific [assembly videos and PDFs](https://biggreenegg.com/blogs/guides/assembly) that walk you through the process step by step. The 2XL EGG is our largest model and requires careful handling during assembly due to its weight.";
-      } else if (
-        lowerMessage.includes("xl") &&
-        !lowerMessage.includes("2xl") &&
-        !lowerMessage.includes("2 xl") &&
-        !lowerMessage.includes("xxl")
-      ) {
-        assemblyMessage +=
-          "For your XL EGG, we have specific [assembly videos and PDFs](https://biggreenegg.com/blogs/guides/assembly) that walk you through the process step by step. The XL EGG is a popular size for those who entertain frequently.";
-      } else if (lowerMessage.includes("large")) {
-        assemblyMessage +=
-          "For your Large EGG, we have specific [assembly videos and PDFs](https://biggreenegg.com/blogs/guides/assembly) that walk you through the process step by step. The Large EGG is our most popular size and fits most cooking needs.";
-      } else if (lowerMessage.includes("medium")) {
-        assemblyMessage +=
-          "For your Medium EGG, we have specific [assembly videos and PDFs](https://biggreenegg.com/blogs/guides/assembly) that walk you through the process step by step. The Medium EGG is perfect for smaller families or limited spaces.";
-      } else if (lowerMessage.includes("small")) {
-        assemblyMessage +=
-          "For your Small EGG, we have specific [assembly videos and PDFs](https://biggreenegg.com/blogs/guides/assembly) that walk you through the process step by step. The Small EGG is great for individuals or couples.";
-      } else if (
-        lowerMessage.includes("minimax") ||
-        lowerMessage.includes("mini max")
-      ) {
-        assemblyMessage +=
-          "For your MiniMax EGG, we have specific [assembly videos and PDFs](https://biggreenegg.com/blogs/guides/assembly) that walk you through the process step by step. The MiniMax EGG is portable yet powerful.";
-      } else if (lowerMessage.includes("mini")) {
-        assemblyMessage +=
-          "For your Mini EGG, we have specific [assembly videos and PDFs](https://biggreenegg.com/blogs/guides/assembly) that walk you through the process step by step. The Mini EGG is our most portable option.";
-      }
-      // Specific component assembly
-      else if (lowerMessage.includes("nest")) {
-        if (lowerMessage.includes("handler")) {
-          assemblyMessage +=
-            "For the intEGGrated Nest+Handler, we have a specific [assembly guide](https://biggreenegg.com/blogs/guides/assembly) that shows you how to properly assemble this convenient carrier system for your EGG.";
-        } else if (lowerMessage.includes("modular")) {
-          assemblyMessage +=
-            "For the Modular Nest System, we have detailed [assembly guides](https://biggreenegg.com/blogs/guides/assembly) that show you how to set up this versatile system for your EGG.";
-        } else if (lowerMessage.includes("table")) {
-          assemblyMessage +=
-            "For the Table Nest, we have a specific [assembly guide](https://biggreenegg.com/blogs/guides/assembly) that shows you how to properly set up your EGG in a table.";
-        } else {
-          assemblyMessage +=
-            "For standard Nest assembly, we have detailed [guides](https://biggreenegg.com/blogs/guides/assembly) that walk you through the process step by step.";
-        }
-      } else if (lowerMessage.includes("table")) {
-        assemblyMessage +=
-          "For table assembly, we have detailed [guides](https://biggreenegg.com/blogs/guides/assembly) that show you how to properly set up your table and place your EGG safely within it.";
-      } else if (lowerMessage.includes("carrier")) {
-        assemblyMessage +=
-          "For the EGG Carrier, we have a specific [assembly guide](https://biggreenegg.com/blogs/guides/assembly) that shows you how to properly assemble this portable option for your EGG.";
-      } else if (
-        lowerMessage.includes("band") ||
-        lowerMessage.includes("hinge")
-      ) {
-        assemblyMessage +=
-          "For Egg & Band Assembly, we have detailed [guides](https://biggreenegg.com/blogs/guides/assembly) that show you how to properly install or adjust the metal bands and hinge on your EGG.";
-      } else if (
-        lowerMessage.includes("gasket") ||
-        lowerMessage.includes("felt")
-      ) {
-        assemblyMessage +=
-          "For gasket replacement, we have specific [video guides](https://biggreenegg.com/blogs/guides/assembly) that show you how to remove the old gasket and install a new one for a proper seal on your EGG.";
-      } else if (
-        lowerMessage.includes("built in") ||
-        lowerMessage.includes("built-in")
-      ) {
-        assemblyMessage +=
-          "For built-in installations, we provide detailed spec sheets and [guides](https://biggreenegg.com/blogs/guides/assembly) for contractors and DIY enthusiasts to safely install an EGG in an outdoor kitchen.";
-      } else if (lowerMessage.includes("white glove")) {
-        assemblyMessage +=
-          "We offer White Glove Delivery service where our team will deliver and completely assemble your EGG for you. This service is available through our authorized dealers. Contact your local dealer for availability and pricing.";
-      }
-      // General assembly
-      else {
-        assemblyMessage +=
-          "Our guides include videos and PDFs for all EGG sizes and accessories, including Nests, Tables, Carriers, and more. Big Green Eggs arrive partially assembled, and our guides will help you complete the setup quickly and correctly. We also offer White Glove Delivery service where our team will deliver and completely assemble your EGG for you.";
-      }
-
-      assemblyMessage +=
-        "\n\nRemember that EGGs are heavy ceramic cookers and should be handled with care during assembly. If you have any specific questions about your assembly process, feel free to ask!";
-
-      return NextResponse.json({
-        messages: [createMessage("assistant", assemblyMessage)],
-        category: "customer_support",
-      });
-    }
-
-    // Check for cooking-related queries - MOVED AFTER product recommendation checks
-    if (
-      !isAssemblyInquiry &&
-      (lowerMessage.includes("cook") ||
-        lowerMessage.includes("recipe") ||
-        lowerMessage.includes("bake") ||
-        lowerMessage.includes("grill") ||
-        lowerMessage.includes("smoke") ||
-        lowerMessage.includes("roast") ||
-        lowerMessage.includes("temperature") ||
-        lowerMessage.includes("how to make"))
-    ) {
-      // Use the new recipe handler
-      return NextResponse.json(
-        await handleRecipeRequest(openai, lowerMessage, messages)
-      );
-    }
-
-    // Check if this is a product inquiry (looking for, want to buy, etc.)
-    if (
-      !isAssemblyInquiry &&
-      (lowerMessage.includes("buy") ||
-        lowerMessage.includes("purchase") ||
-        lowerMessage.includes("get") ||
-        lowerMessage.includes("where") ||
-        lowerMessage.includes("link") ||
-        lowerMessage.includes("help") ||
-        lowerMessage.includes("looking for") ||
-        lowerMessage.includes("find") ||
-        lowerMessage.includes("shop") ||
-        lowerMessage.includes("browse") ||
-        lowerMessage === "i want to purchase" ||
-        lowerMessage === "i want to buy" ||
-        lowerMessage.includes("want to purchase") ||
-        lowerMessage.includes("want to buy") ||
-        lowerMessage.includes("how do i buy") ||
-        lowerMessage.includes("how do i purchase") ||
-        lowerMessage.includes("where can i buy") ||
-        lowerMessage.includes("where can i purchase"))
-    ) {
-      // Check if this is the exact browse products message from the button
-      if (lowerMessage === "i want to browse your products") {
-        productMessage =
-          "You can browse all our products on the [Big Green Egg website](https://biggreenegg.com/collections). Here are some popular categories:\n\n" +
-          "• [Egg Packages](https://biggreenegg.com/collections/all-eggs-egg-packages)\n\n" +
-          "• [Modular Systems, Tables & Stands](https://biggreenegg.com/collections/all-modular-system-tables-stands)\n\n" +
-          "• [Accessories](https://biggreenegg.com/collections/accessories)\n\n" +
-          "• [Cookware & Tools](https://biggreenegg.com/collections/cookware-tools)\n\n" +
-          "• [Lifestyle & Gear](https://biggreenegg.com/collections/all-lifestyle-gear-1)\n\n" +
-          "• [Spices & Sauces](https://biggreenegg.com/collections/spices-sauces)\n\n" +
-          "• [Covers & Cleaning](https://biggreenegg.com/collections/covers-cleaning)\n\n" +
-          "• [Charcoal, Woods & Starters](https://biggreenegg.com/collections/charcoal-wood-starters)\n\n" +
-          "• [Replacement Parts](https://biggreenegg.com/collections/replacement-parts)\n\n" +
-          "Let me know if you're looking for something specific!";
-
-        return NextResponse.json({
-          messages: [createMessage("assistant", productMessage)],
-          category: "merchandise",
-        });
-      }
-
-      // Check if this is a direct purchase request after product recommendations
-      if (
-        lowerMessage === "i want to purchase" ||
-        lowerMessage === "i want to buy" ||
-        lowerMessage === "purchase" ||
-        lowerMessage === "buy" ||
-        lowerMessage === "yes i want to purchase" ||
-        lowerMessage === "yes i want to buy" ||
-        lowerMessage.includes("i want to purchase all of this") ||
-        lowerMessage.includes("i want to purchase the accessories") ||
-        lowerMessage.includes("i want to buy all of this") ||
-        lowerMessage.includes("i want to buy the accessories") ||
-        lowerMessage.includes("i want the xl package") ||
-        lowerMessage.includes("i want the large package") ||
-        lowerMessage.includes("i want the 2xl package") ||
-        lowerMessage.includes("i want the medium package") ||
-        lowerMessage.includes("i want the small package") ||
-        lowerMessage.includes("i want the minimax package") ||
-        lowerMessage.includes("i want the mini package") ||
-        lowerMessage.includes("purchase the accessories") ||
-        lowerMessage.includes("buy the accessories") ||
-        lowerMessage.includes("purchase all of this") ||
-        lowerMessage.includes("buy all of this") ||
-        (lowerMessage.includes("purchase") &&
-          lowerMessage.includes("package")) ||
-        (lowerMessage.includes("buy") && lowerMessage.includes("package"))
-      ) {
-        // Look back through messages to find what product was recommended
-        let recommendedProduct = "";
-        let recommendedAccessories = false;
-
-        // First check if the current message mentions a specific product
-        if (
-          lowerMessage.includes("xl package") ||
-          lowerMessage.includes("xl big green egg")
-        ) {
-          recommendedProduct = "XL Big Green Egg";
-        } else if (
-          lowerMessage.includes("2xl package") ||
-          lowerMessage.includes("2xl big green egg")
-        ) {
-          recommendedProduct = "2XL Big Green Egg";
-        } else if (
-          lowerMessage.includes("large package") ||
-          lowerMessage.includes("large big green egg")
-        ) {
-          recommendedProduct = "Large Big Green Egg";
-        } else if (
-          lowerMessage.includes("medium package") ||
-          lowerMessage.includes("medium big green egg")
-        ) {
-          recommendedProduct = "Medium Big Green Egg";
-        } else if (
-          lowerMessage.includes("small package") ||
-          lowerMessage.includes("small big green egg")
-        ) {
-          recommendedProduct = "Small Big Green Egg";
-        } else if (
-          lowerMessage.includes("minimax package") ||
-          lowerMessage.includes("minimax big green egg")
-        ) {
-          recommendedProduct = "MiniMax Big Green Egg";
-        } else if (
-          lowerMessage.includes("mini package") ||
-          lowerMessage.includes("mini big green egg")
-        ) {
-          recommendedProduct = "Mini Big Green Egg";
-        }
-
-        // Check if accessories are mentioned
-        if (
-          lowerMessage.includes("accessories") ||
-          lowerMessage.includes("all of this") ||
-          lowerMessage.includes("with this")
-        ) {
-          recommendedAccessories = true;
-        }
-
-        // If no specific product in current message, look through conversation history
-        if (!recommendedProduct) {
-          for (let i = messages.length - 2; i >= 0; i--) {
-            const msg = messages[i];
-            if (msg.role === "assistant" && msg.content) {
-              if (msg.content.includes("XL Big Green Egg")) {
-                recommendedProduct = "XL Big Green Egg";
-                break;
-              } else if (msg.content.includes("2XL Big Green Egg")) {
-                recommendedProduct = "2XL Big Green Egg";
-                break;
-              } else if (msg.content.includes("Large Big Green Egg")) {
-                recommendedProduct = "Large Big Green Egg";
-                break;
-              } else if (msg.content.includes("Medium Big Green Egg")) {
-                recommendedProduct = "Medium Big Green Egg";
-                break;
-              } else if (msg.content.includes("Small Big Green Egg")) {
-                recommendedProduct = "Small Big Green Egg";
-                break;
-              } else if (msg.content.includes("MiniMax Big Green Egg")) {
-                recommendedProduct = "MiniMax Big Green Egg";
-                break;
-              } else if (msg.content.includes("Mini Big Green Egg")) {
-                recommendedProduct = "Mini Big Green Egg";
-                break;
-              }
-            }
-          }
-        }
-
-        // Also check for accessories in conversation history if not already found
-        if (!recommendedAccessories) {
-          for (let i = messages.length - 10; i < messages.length; i++) {
-            if (i >= 0 && messages[i] && messages[i].content) {
-              const content = messages[i].content.toLowerCase();
-              if (
-                content.includes("eggspander kit") ||
-                content.includes("fire bowl") ||
-                content.includes("egg genius") ||
-                content.includes("temperature controller") ||
-                content.includes("acacia hardwood table") ||
-                content.includes("pizza & baking stone") ||
-                content.includes("pizza stone")
-              ) {
-                recommendedAccessories = true;
-                break;
-              }
-            }
-          }
-        }
-
-        if (recommendedProduct) {
-          if (recommendedAccessories) {
-            productMessage =
-              `Great choice! You can purchase the ${recommendedProduct} with all the recommended accessories through our website or at an authorized dealer.\n\n` +
-              "**Complete Package Purchase Options:**\n" +
-              "1. Visit our [official Big Green Egg website](https://biggreenegg.com/collections/all-eggs-egg-packages) to browse all EGG packages.\n" +
-              "2. For the XL EGG with accessories, check out the [XL Big Green Egg Package](https://biggreenegg.com/collections/all-eggs-egg-packages/products/xl-big-green-egg-in-a-corner-modular-package).\n\n" +
-              "**Recommended Accessories for Your Package:**\n" +
-              "• 5-Piece EGGspander Kit ($349.99)\n" +
-              "• Stainless Steel Fire Bowl ($84.99)\n" +
-              "• EGG Genius Temperature Controller ($249.99)\n" +
-              "• Acacia Hardwood Table\n" +
-              "• Pizza & Baking Stone ($69.99)\n\n" +
-              "**Find a Dealer Near You:**\n" +
-              "Big Green Egg products are sold through authorized dealers who can help you create a custom package with all these accessories. You can [find your nearest dealer here](https://biggreenegg.com/pages/international-dealers).\n\n" +
-              "Would you like me to help you with anything else about your purchase?";
-          } else {
-            productMessage =
-              `Great choice! You can purchase the ${recommendedProduct} through our website or at an authorized dealer.\n\n` +
-              "**Online Purchase Options:**\n" +
-              "1. Visit our [official Big Green Egg website](https://biggreenegg.com/collections/all-eggs-egg-packages) to browse all EGG sizes and packages.\n" +
-              "2. For the complete package with accessories you're interested in, check out our [EGG packages](https://biggreenegg.com/collections/all-eggs-egg-packages).\n\n" +
-              "**Find a Dealer Near You:**\n" +
-              "Big Green Egg products are sold through authorized dealers. You can [find your nearest dealer here](https://biggreenegg.com/pages/international-dealers).\n\n" +
-              "Would you like me to help you with anything else about your purchase?";
-          }
-
-          isProductInquiry = true;
         }
         // Temperature controllers
         else if (
