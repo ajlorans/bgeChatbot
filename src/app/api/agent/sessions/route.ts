@@ -30,10 +30,10 @@ export async function GET(req: NextRequest) {
     let where = {};
 
     if (status === "active") {
+      // Only show active chats assigned to this specific agent
       where = {
         status: "active",
         agentId: session.user.agentId,
-        NOT: { agentId: null },
       };
       console.log("Active filter:", JSON.stringify(where));
     } else if (status === "waiting") {
@@ -48,6 +48,7 @@ export async function GET(req: NextRequest) {
         agentId: session.user.agentId,
       };
     } else {
+      // For all other statuses, still filter by this agent's ID for personal sessions
       where = {
         OR: [
           {
@@ -101,6 +102,7 @@ export async function GET(req: NextRequest) {
       status: session.status,
       createdAt: session.createdAt.toISOString(),
       updatedAt: session.updatedAt.toISOString(),
+      agentId: session.agentId || null,
       agentName: session.agent?.user?.name || null,
       lastMessage: session.messages[0]?.content || null,
       recentMessages: session.messages.map((msg) => ({
@@ -110,7 +112,6 @@ export async function GET(req: NextRequest) {
         role: msg.role,
         isAgent: msg.role === "agent",
       })),
-      unreadCount: 0, // This would need to be calculated based on read status of messages
     }));
 
     return NextResponse.json({

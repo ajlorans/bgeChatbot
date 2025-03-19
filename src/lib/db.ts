@@ -4,15 +4,14 @@ import { PrismaClient } from "@prisma/client";
 // exhausting your database connection limit.
 // Learn more: https://pris.ly/d/help/next-js-best-practices
 
+// Set Prisma log levels directly
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
-export const prisma =
-  globalForPrisma.prisma ||
+// Create Prisma client with logging disabled
+export const prisma = globalForPrisma.prisma || 
   new PrismaClient({
-    log:
-      process.env.NODE_ENV === "development"
-        ? ["query", "error", "warn"]
-        : ["error"],
+    log: ["error", "warn"],
   });
 
+// Save prisma client in global to prevent multiple instances in development
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;

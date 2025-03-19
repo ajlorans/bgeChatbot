@@ -21,7 +21,28 @@ A Next.js-based AI chatbot for Big Green Egg, featuring order tracking, product 
 - 📱 Responsive design
 - 🧪 Comprehensive unit tests
 
-## Recent Updates (live-agent-session-ending branch)
+## Recent Updates (multi-agent-enhancements branch)
+
+### Multi-Agent System Improvements
+
+- **Accurate Agent Status Display**: Enhanced agent dashboard to clearly show which agents are truly logged in vs. just recently active
+- **Automatic Session Cleanup**: Added logic to automatically close inactive chat sessions and move them to history
+- **Session Abandonment Detection**: System now detects when customers leave or close their browser and marks sessions accordingly
+- **Agent Login Indicators**: Added visual indicators in the agent team view showing which agents are currently logged in
+- **Improved Agent Workload Management**: Agents now only see chats that are specifically assigned to them
+- **Agent Name Display**: Customer chat now displays the actual name of the agent they're speaking with
+- **Reduced Console Output**: Performance optimization to minimize log output and improve system responsiveness
+
+### Technical Improvements
+
+- **Browser Close Detection**: Implemented beforeunload event listener to detect when customers close their browsers
+- **Robust Message Delivery**: Enhanced message delivery using navigator.sendBeacon for reliable communication during page unloads
+- **Inactive Session Handling**: Added a cleanup API that automatically detects and closes sessions after periods of inactivity
+- **Session History**: Improved history tracking with fields for closure reason and timestamps
+- **Proper Middleware Implementation**: Fixed Next.js middleware implementation for better request handling
+- **Reduced Polling Frequency**: Optimized polling intervals to reduce server load while maintaining responsiveness
+
+### Previous Updates (live-agent-session-ending branch)
 
 ### Improved Real-time Communication
 

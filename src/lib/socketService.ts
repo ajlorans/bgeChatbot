@@ -27,6 +27,8 @@ export interface ServerToClientEvents {
   customerTyping: (data: { sessionId: string; isTyping: boolean }) => void;
   agentStatusChange: (data: { agentId: string; status: string }) => void;
   chatEnded: (data: { sessionId: string; endedBy: 'agent' | 'customer' }) => void;
+  'chat:claimed': (data: { sessionId: string; agentId: string; agentName: string; timestamp: Date }) => void;
+  'chat:newWaitingSession': (session: any) => void;
 }
 
 export interface ClientToServerEvents {
@@ -204,24 +206,75 @@ export const initSocketServer = (
         const userId = socket.data.user.id;
         const isAgent = !!socket.data.user.agentId;
 
+        console.log(`Message from ${isAgent ? 'agent' : 'customer'} in session ${sessionId}`);
+
         // Verify the session exists
         const session = await prisma.chatSession.findUnique({
           where: { id: sessionId },
+          include: {
+            agent: {
+              include: {
+                user: {
+                  select: {
+                    name: true,
+                    email: true
+                  }
+                }
+              }
+            }
+          }
         });
 
         if (!session) {
+          console.error(`Session ${sessionId} not found`);
           socket.emit("error", "Session not found");
           return;
         }
 
-        // Create the message
+        // For agents, verify they have access to this session
+        if (isAgent && socket.data.user.agentId !== session.agentId) {
+          console.error(`Agent ${socket.data.user.agentId} doesn't have access to session ${sessionId}`);
+          socket.emit("error", "You don't have access to this session");
+          return;
+        }
+
+        // Get agent name if this is an agent message
+        let agentName = null;
+        if (isAgent && session.agent?.user) {
+          agentName = session.agent.user.name || "Agent";
+          console.log(`Using agent name from session: ${agentName}`);
+        } else if (isAgent) {
+          // Fallback to user lookup if not in session
+          const agent = await prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+              name: true,
+              email: true
+            }
+          });
+          
+          agentName = agent?.name || "Agent";
+          console.log(`Agent name retrieved from user lookup: ${agentName}`);
+        }
+
+        // Create the message with metadata
+        const messageData: any = {
+          content,
+          role: isAgent ? "agent" : "user",
+          sessionId,
+          timestamp: new Date(),
+        };
+        
+        // Only add metadata if it's from an agent
+        if (isAgent) {
+          messageData.metadata = JSON.stringify({
+            agentId: socket.data.user.agentId,
+            agentName: agentName
+          });
+        }
+        
         const message = await prisma.message.create({
-          data: {
-            content,
-            role: isAgent ? "agent" : "customer",
-            sessionId,
-            timestamp: new Date(),
-          },
+          data: messageData
         });
 
         // Update session's last activity
@@ -238,9 +291,22 @@ export const initSocketServer = (
           });
         }
 
+        // Create the formatted message to broadcast
+        const formattedMessage = {
+          id: message.id,
+          content: message.content,
+          role: message.role,
+          timestamp: message.timestamp.toISOString(),
+          sessionId: String(sessionId),
+          agentName: agentName // Add agent name directly to the message
+        };
+
+        console.log(`Broadcasting message to session ${sessionId}`);
+
         // Broadcast the message to everyone in the session
         if (io) {
-          io.to(sessionId).emit("messageReceived", message);
+          io.to(String(sessionId)).emit("messageReceived", formattedMessage);
+          console.log(`Message broadcast to session ${sessionId} complete`);
         }
       } catch (error) {
         console.error("Error sending message via socket:", error);

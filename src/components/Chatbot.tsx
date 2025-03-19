@@ -155,24 +155,29 @@ const OrderStatusForm: React.FC<OrderStatusFormProps> = ({
   );
 };
 
-const Chatbot: React.FC<ChatbotProps> = ({
+const Chatbot = ({
   initialMessage = "Hi there! I'm your Big Green Egg assistant. How can I help you today?",
   primaryColor = "#006838", // BGE green
   botName = "BGE Assistant",
   showChatBubble = true,
-}) => {
+  ...props
+}: ChatbotProps) => {
+  // Define all refs at the beginning of the component
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const prevMessagesRef = useRef<Message[]>([]);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  
   const { isOpen, toggleChat, closeChat } = useChatbotContext();
   const [inputValue, setInputValue] = useState("");
   const [showQuickActions, setShowQuickActions] = useState(true);
   const [showOrderStatusForm, setShowOrderStatusForm] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [emailError, setEmailError] = useState("");
   const [nameError, setNameError] = useState("");
   const [showEmailInput, setShowEmailInput] = useState(false);
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [hasInteractedWithChat, setHasInteractedWithChat] = useState(false);
 
   const {
@@ -185,6 +190,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
     requestLiveAgent,
     endLiveChat,
     resetChat,
+    agentName: currentAgentName,
   } = useChatbot({
     initialMessage,
   });
@@ -203,10 +209,12 @@ const Chatbot: React.FC<ChatbotProps> = ({
 
   // Hide quick actions after first user message
   useEffect(() => {
-    if (messages.some((msg) => msg.role === "user")) {
+    const hasUserMessage = messages.some((msg) => msg.role === "user");
+    
+    if (hasUserMessage && showQuickActions) {
       setShowQuickActions(false);
     }
-  }, [messages]);
+  }, [messages, showQuickActions]);
 
   const handleQuickAction = async (action: string) => {
     let message = "";
@@ -340,30 +348,29 @@ const Chatbot: React.FC<ChatbotProps> = ({
     return re.test(email);
   };
 
-  // Handle live chat status display
+  // Fix the renderLiveChatStatus function with proper type checking
   const renderLiveChatStatus = () => {
     if (!isLiveChat) return null;
 
     if (liveChatStatus === "queued" || liveChatStatus === "waiting") {
+      const queuePosition = liveChatDetails?.queuePosition;
+      const estimatedTime = liveChatDetails?.estimatedWaitTime;
+
       return (
         <div className="flex items-center p-2 bg-yellow-50 border-y border-yellow-200">
           <ClockIcon className="w-5 h-5 mr-2 text-yellow-500" />
           <span className="text-sm">
-            <span className="font-medium">Waiting for an agent...</span>
-            {liveChatDetails &&
-              liveChatDetails.queuePosition &&
-              liveChatDetails.queuePosition > 0 && (
-                <span className="block mt-1">
-                  Position in queue: #{liveChatDetails.queuePosition}
-                </span>
-              )}
-            {liveChatDetails &&
-              liveChatDetails.estimatedWaitTime &&
-              liveChatDetails.estimatedWaitTime > 0 && (
-                <span className="block mt-1">
-                  Estimated wait time: ~{liveChatDetails.estimatedWaitTime} min
-                </span>
-              )}
+            <span className="font-medium text-gray-800">Waiting for an agent...</span>
+            {queuePosition !== undefined && queuePosition > 0 && (
+              <span className="block mt-1 text-gray-800">
+                Position in queue: #{queuePosition}
+              </span>
+            )}
+            {estimatedTime !== undefined && estimatedTime > 0 && (
+              <span className="block mt-1 text-gray-800">
+                Estimated wait time: ~{estimatedTime} minutes
+              </span>
+            )}
           </span>
         </div>
       );
@@ -373,8 +380,8 @@ const Chatbot: React.FC<ChatbotProps> = ({
       return (
         <div className="flex items-center p-2 bg-green-50 border-y border-green-200">
           <UserIcon className="w-5 h-5 mr-2 text-green-500" />
-          <span className="text-sm">
-            Connected with {liveChatDetails?.agentName || "Agent"}
+          <span className="text-sm text-gray-800">
+            Connected with {currentAgentName || liveChatDetails?.agentName || "Agent"}
           </span>
           <button
             onClick={endLiveChat}
@@ -551,17 +558,29 @@ const Chatbot: React.FC<ChatbotProps> = ({
     );
   };
 
-  // Listen for socket events directly
+  // Fix the useEffect with useRef
   useEffect(() => {
-    // Clean up on unmount
-    return () => {
-      // Ensure polling stops when component unmounts
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
+    // Use the refs defined at the top level of the component
+    // Don't create new refs here
+    
+    // Function to handle changes that won't re-trigger effects
+    const handleNewMessages = () => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
       }
     };
-  }, []);
+
+    // Only run side effects if messages actually changed
+    if (JSON.stringify(messages) !== JSON.stringify(prevMessagesRef.current)) {
+      prevMessagesRef.current = [...messages];
+      handleNewMessages();
+    }
+    
+    // Clean up on unmount
+    return () => {
+      // Cleanup code...
+    };
+  }, [messages]);
 
   // Custom toggle chat function to track interactions
   const handleToggleChat = () => {
@@ -577,6 +596,37 @@ const Chatbot: React.FC<ChatbotProps> = ({
     setHasInteractedWithChat(true);
     closeChat();
   };
+
+  // Add an effect to handle window close/refresh events
+  useEffect(() => {
+    // Function to notify the server when the window is closed/refreshed
+    const handleBeforeUnload = () => {
+      // If we have an active live chat session, notify the server
+      if (isLiveChat && liveChatDetails?.sessionId) {
+        try {
+          // Using navigator.sendBeacon for reliable delivery during page unload
+          const data = JSON.stringify({
+            sessionId: liveChatDetails.sessionId,
+            reason: 'customer_left',
+            endedBy: 'customer'
+          });
+          
+          // Use sendBeacon which works better during page unload than fetch
+          navigator.sendBeacon('/api/chat/live-chat/end', data);
+        } catch (error) {
+          // Can't log during unload, but we tried our best
+        }
+      }
+    };
+    
+    // Add event listener for beforeunload
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // Cleanup the event listener
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isLiveChat, liveChatDetails]);
 
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end">
@@ -673,30 +723,48 @@ const Chatbot: React.FC<ChatbotProps> = ({
               )
               .map((message, index) => (
                 <div
-                  key={`${message.id}-${index}`}
+                  key={index}
                   className={`flex ${
                     message.role === "user" ? "justify-end" : "justify-start"
-                  } mb-3`}
+                  } mb-4`}
                 >
-                  {message.role !== "user" && message.role !== "system" && (
-                    <div
-                      className="flex items-center justify-center w-8 h-8 mr-2 text-white rounded-full"
-                      style={{ backgroundColor: primaryColor }}
-                    >
-                      {message.role === "agent" ? (
+                  {message.role === "agent" && (
+                    <div className="flex flex-col items-center mr-2">
+                      <div className="flex items-center justify-center w-8 h-8 text-white bg-green-600 rounded-full">
                         <UserIcon className="w-5 h-5" />
-                      ) : (
-                        <ChatBubbleLeftRightIcon className="w-5 h-5" />
-                      )}
+                      </div>
+                      <span className="text-xs text-gray-600 mt-1 whitespace-nowrap">
+                        {message.agentName || currentAgentName || "Agent"}
+                      </span>
                     </div>
                   )}
-
+                  
+                  {message.role === "assistant" && (
+                    <div className="flex flex-col items-center mr-2">
+                      <div className="flex items-center justify-center w-8 h-8 text-white bg-green-600 rounded-full">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="w-5 h-5"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.625 6.4c-.125.125-.22.274-.282.411-.062.137-.11.29-.138.434h3.59c-.029-.145-.076-.297-.138-.434-.063-.137-.158-.286-.281-.41-.229-.229-.57-.386-.886-.386-.318 0-.658.157-.886.385l-.978.979zm1.382-.282c.374 0 .733.149 1.14.386.253-.307.392-.683.392-1.065 0-.399-.157-.78-.438-1.062A1.501 1.501 0 0010 4c-.828 0-1.5.672-1.5 1.5 0 .382.139.758.393 1.065.406-.237.765-.386 1.14-.386h-.026zm4.343 7.57l-1.088 1.089a1.71 1.71 0 01-1.214.5H7.952c-.454 0-.894-.167-1.214-.5L5.65 13.7a1.694 1.694 0 01-.5-1.213V7.88c0-.563.137-1.107.396-1.595l.667-1.222a1.69 1.69 0 011.585-.968c.693.033 1.286.5 1.5 1.171l.214.688a1.68 1.68 0 001.59 1.123h.374c.709 0 1.33-.472 1.52-1.152l.204-.682c.22-.67.81-1.2 1.5-1.2a1.69 1.69 0 011.638 1.246l.148.536c.117.425.18.864.18 1.306v3.544c0 .341-.102.673-.29.957z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </div>
+                      <span className="text-xs text-gray-600 mt-1">BGE Assistant</span>
+                    </div>
+                  )}
+                  
                   <div
-                    className={`max-w-[80%] px-4 py-2 rounded-lg ${
-                      message.role === "user"
+                    className={`px-4 py-2 rounded-lg max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg ${
+                      message.role === "system"
+                        ? "bg-blue-100 text-blue-800 italic mx-auto w-full max-w-full"
+                        : message.role === "user"
                         ? "bg-blue-500 text-white rounded-br-none"
-                        : message.role === "system"
-                        ? "bg-gray-200 text-gray-700"
                         : message.role === "agent"
                         ? "bg-green-100 text-gray-800 rounded-bl-none border border-green-200"
                         : "bg-gray-100 text-gray-800 rounded-bl-none"
@@ -715,8 +783,13 @@ const Chatbot: React.FC<ChatbotProps> = ({
                   </div>
 
                   {message.role === "user" && (
-                    <div className="flex items-center justify-center w-8 h-8 ml-2 text-white bg-blue-500 rounded-full">
-                      <UserIcon className="w-5 h-5" />
+                    <div className="flex flex-col items-center ml-2">
+                      <div className="flex items-center justify-center w-8 h-8 text-white bg-blue-500 rounded-full">
+                        <UserIcon className="w-5 h-5" />
+                      </div>
+                      <span className="text-xs text-gray-600 mt-1 whitespace-nowrap">
+                        {customerName || "You"}
+                      </span>
                     </div>
                   )}
                 </div>

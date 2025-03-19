@@ -6,6 +6,7 @@ import React, {
   useEffect,
   useState,
   useRef,
+  useCallback,
 } from "react";
 import { io, Socket } from "socket.io-client";
 import type {
@@ -48,7 +49,77 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const [lastSessionUpdate, setLastSessionUpdate] = useState<any>(null);
   const [agentTyping, setAgentTyping] = useState(false);
   const [customerTyping, setCustomerTyping] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
 
+  // Define all callbacks at the component level, not inside useEffect
+  const handleMessageReceived = useCallback((message: any) => {
+    console.log("Message received:", message);
+    
+    // Make sure the message has a unique ID
+    if (!message.id) {
+      message.id = uuidv4();
+    }
+    
+    // Extract agent name from metadata if available
+    let agentName = message.agentName;
+    
+    // Fallback to metadata extraction if agentName not directly on message
+    if (!agentName && message.role === 'agent' && message.metadata) {
+      try {
+        // Handle both string and object metadata
+        if (typeof message.metadata === 'string') {
+          const parsedMetadata = JSON.parse(message.metadata);
+          agentName = parsedMetadata.agentName;
+        } else if (message.metadata.agentName) {
+          agentName = message.metadata.agentName;
+        }
+      } catch (e) {
+        console.error("Error parsing message metadata:", e);
+      }
+    }
+    
+    // Create formatted message with agent name
+    const formattedMessage = {
+      ...message,
+      agentName,
+      timestamp: message.timestamp || new Date().toISOString(),
+    };
+    
+    // Add to messages
+    setMessages(prevMessages => [...prevMessages, formattedMessage]);
+    
+    // Update last message
+    setLastMessage(formattedMessage);
+  }, []);
+
+  const handleNewMessage = useCallback((message: Message) => {
+    console.log("New message:", message);
+    
+    // Ensure we don't have duplicate message IDs by using a different handling path
+    setLastMessage({ 
+      ...message, 
+      // For typescript compatibility, we need to ensure the property exists
+      timestamp: message.timestamp,
+      // Only add agentName if it exists in the source message object
+      ...(message.agentName ? { agentName: message.agentName } : {})
+    });
+  }, []);
+
+  const handleSessionUpdated = useCallback((session: any) => {
+    console.log("Session updated:", session);
+    setLastSessionUpdate(session);
+  }, []);
+
+  // Handle typing indicators with proper typing
+  const handleAgentTyping = useCallback((data: { sessionId: string; isTyping: boolean }) => {
+    setAgentTyping(data.isTyping);
+  }, []);
+
+  const handleCustomerTyping = useCallback((data: { sessionId: string; isTyping: boolean }) => {
+    setCustomerTyping(data.isTyping);
+  }, []);
+
+  // Socket initialization effect
   useEffect(() => {
     // Initialize socket connection
     const socketInstance = io({
@@ -110,6 +181,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     };
   }, []);
 
+  // Socket event handlers effect
   useEffect(() => {
     if (!socket) return;
 
@@ -122,46 +194,25 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       console.error("Socket error:", error);
     };
 
-    const handleMessageReceived = (message: Message) => {
-      console.log("Message received:", message);
-      // Make sure the message has a unique ID
-      if (!message.id) {
-        message.id = uuidv4();
-      }
-      setLastMessage(message);
-    };
-
-    const handleNewMessage = (message: Message) => {
-      console.log("New message received:", message);
-      // Make sure the message has a unique ID
-      if (!message.id) {
-        message.id = uuidv4();
-      }
-      // Ensure we don't have duplicate message IDs by using a different handling path
-      setLastMessage({ ...message, receivedAt: Date.now() });
-    };
-
-    const handleSessionUpdated = (session: any) => {
-      console.log("Session updated:", session);
-      setLastSessionUpdate(session);
-    };
-
+    // Update the socket event handlers
     socket.on("disconnect", handleDisconnect);
     socket.on("error", handleError);
     socket.on("messageReceived", handleMessageReceived);
+    socket.on("newMessage", handleNewMessage);
     socket.on("sessionUpdated", handleSessionUpdated);
-    socket.on("agentTyping", setAgentTyping);
-    socket.on("customerTyping", setCustomerTyping);
+    socket.on("agentTyping", handleAgentTyping);
+    socket.on("customerTyping", handleCustomerTyping);
 
     return () => {
       socket.off("disconnect", handleDisconnect);
       socket.off("error", handleError);
       socket.off("messageReceived", handleMessageReceived);
+      socket.off("newMessage", handleNewMessage);
       socket.off("sessionUpdated", handleSessionUpdated);
-      socket.off("agentTyping", setAgentTyping);
-      socket.off("customerTyping", setCustomerTyping);
+      socket.off("agentTyping", handleAgentTyping);
+      socket.off("customerTyping", handleCustomerTyping);
     };
-  }, [socket]);
+  }, [socket, handleMessageReceived, handleNewMessage, handleSessionUpdated, handleAgentTyping, handleCustomerTyping]);
 
   // Provide the socket and related state to the application
   return (

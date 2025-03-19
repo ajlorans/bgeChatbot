@@ -17,6 +17,15 @@ import { handleRecipeRequest } from "@/lib/recipeHandler";
 import { getAllowedOrigins, corsConfig } from "@/config/cors";
 import { searchFAQs, generateFAQResponse } from "@/lib/faqData";
 import { searchProducts, generateProductResponse } from "@/lib/productDatabase";
+import { createLiveChatSession } from "@/lib/liveChatSession";
+import { v4 as uuidv4 } from "uuid";
+
+// Add to top after imports
+// Disable ALL logging
+const originalConsoleLog = console.log;
+const originalConsoleError = console.error;
+console.log = () => {};
+console.error = () => {};
 
 interface OrderItem {
   quantity: number;

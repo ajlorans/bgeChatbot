@@ -144,24 +144,35 @@ export async function POST(
       );
     }
 
+    // Get agent information for the message
+    const agent = await prisma.user.findUnique({
+      where: { id: userSession.user.id },
+      select: {
+        name: true,
+        email: true,
+      },
+    });
+
     // Create the message
     const message = await prisma.message.create({
       data: {
         sessionId,
         role: "agent",
         content,
-        category: category || null,
+        category: category || "general",
         timestamp: new Date(),
-        metadata: {},
+        metadata: JSON.stringify({
+          agentId: userSession.user.agentId,
+          agentName: agent?.name || "Agent",
+          agentEmail: agent?.email,
+        }),
       },
     });
 
-    // Ensure the session is in active status and assigned to this agent
+    // Update the chat session's updated_at timestamp
     await prisma.chatSession.update({
       where: { id: sessionId },
       data: {
-        status: "active",
-        agentId: userSession.user.agentId,
         updatedAt: new Date(),
       },
     });
@@ -184,15 +195,18 @@ export async function POST(
           isSystem: false,
           sessionId: String(sessionId),
           chatSessionId: String(sessionId),
+          agentName: agent?.name || "Agent",
           metadata: {
             chatSessionId: String(sessionId),
             messageId: message.id,
             agentId: userSession.user.agentId,
+            agentName: agent?.name || "Agent"
           },
         };
 
         // Log active rooms
         console.log(`Active socket rooms:`, io.sockets.adapter.rooms);
+        console.log(`Sending message from agent: ${agent?.name}`);
 
         // Use multiple strategies to ensure message delivery
 

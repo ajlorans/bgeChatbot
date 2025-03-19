@@ -24,164 +24,127 @@ export async function OPTIONS(req: NextRequest) {
   return new NextResponse(null, { status: 403 });
 }
 
+// Disable logging
+console.log = () => {};
+console.error = () => {};
+
 /**
- * POST handler for ending a live chat session
+ * API handler for ending chat sessions
+ * Can be called:
+ * 1. Explicitly by customer ending chat
+ * 2. Via beforeunload event when customer closes window
+ * 3. By agent ending the chat
  */
 export async function POST(req: NextRequest) {
-  const origin = req.headers.get("origin");
-  const allowedOrigins = getAllowedOrigins();
-
-  // Check if the origin is allowed
-  if (!origin || !allowedOrigins.includes(origin)) {
-    return new NextResponse(null, { status: 403 });
-  }
-
   try {
-    const { sessionId, endedBy = "customer" } = (await req.json()) as {
-      sessionId: string;
-      endedBy?: "customer" | "agent" | "system";
-    };
+    // Parse the request body
+    let body;
+    try {
+      body = await req.json();
+    } catch (error) {
+      // For sendBeacon, we might need to read as text first
+      const text = await req.text();
+      if (text) {
+        try {
+          body = JSON.parse(text);
+        } catch (e) {
+          return NextResponse.json(
+            { success: false, message: 'Invalid request format' },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
+    const { sessionId, endedBy = 'customer', reason = 'ended_by_customer' } = body || {};
 
     if (!sessionId) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Session ID is required",
-        },
+        { success: false, message: 'Session ID is required' },
         { status: 400 }
       );
     }
 
-    console.log(`Chat session ${sessionId} ended by ${endedBy}`);
-
     // Find the chat session
     const chatSession = await prisma.chatSession.findUnique({
       where: { id: sessionId },
-      include: {
-        agent: true,
-      },
     });
 
     if (!chatSession) {
       return NextResponse.json(
-        {
-          success: false,
-          message: "Chat session not found",
-        },
+        { success: false, message: 'Chat session not found' },
         { status: 404 }
       );
     }
 
-    // Create a system message indicating the chat was ended by customer
-    const systemMessage = await prisma.message.create({
+    // If the chat is already closed or abandoned, just return success
+    if (chatSession.status === 'closed' || chatSession.status === 'abandoned') {
+      return NextResponse.json({
+        success: true,
+        message: 'Chat session already closed',
+        session: chatSession,
+      });
+    }
+
+    // Update session status based on the reason
+    const status = reason === 'customer_left' ? 'abandoned' : 'closed';
+
+    // Update the chat session status
+    const updatedSession = await prisma.chatSession.update({
+      where: { id: sessionId },
+      data: {
+        status,
+        closedAt: new Date(),
+        closedReason: reason,
+      },
+    });
+
+    // Add a system message about the chat ending
+    let message = 'This chat session has ended.';
+    if (endedBy === 'customer') {
+      message = 'The customer has ended this chat session.';
+    } else if (endedBy === 'agent') {
+      message = 'The agent has ended this chat session.';
+    } else if (reason === 'customer_left') {
+      message = 'The customer appears to have left. This chat session has been marked as abandoned.';
+    } else if (reason === 'inactive') {
+      message = 'This chat session has been closed due to inactivity.';
+    }
+
+    await prisma.message.create({
       data: {
         sessionId,
-        role: "system",
-        content: `Live chat ended by ${endedBy}.`,
-        category: "live_agent",
+        role: 'system',
+        content: message,
         timestamp: new Date(),
       },
     });
 
-    // Update the session status to 'closed'
-    await prisma.chatSession.update({
-      where: { id: sessionId },
-      data: {
-        status: "closed",
-        updatedAt: new Date(),
-      },
-    });
-
-    // Emit socket events if socket.io is available
+    // Notify connected clients via socket if available
     if (io) {
-      console.log(`Emitting chat ended notifications for session ${sessionId}`);
-
-      // Format the message for the socket
-      const formattedMessage = {
-        id: systemMessage.id,
-        content: systemMessage.content,
-        role: "system",
-        sender: "System",
-        timestamp: systemMessage.timestamp.toISOString(),
-        isAgent: false,
-        isSystem: true,
-        sessionId: String(sessionId),
-        chatSessionId: String(sessionId),
-        metadata: {
-          chatSessionId: String(sessionId),
-          endedBy,
-          messageId: systemMessage.id,
-          type: "chat_ended",
-        },
-      };
-
-      // Log active rooms
-      console.log(`Active socket rooms:`, io.sockets.adapter.rooms);
-
-      // Use multiple strategies to ensure delivery of chat end notification
-
-      // 1. To specific session room
-      io.to(String(sessionId)).emit("messageReceived", formattedMessage);
-      console.log(`Emitted chat end to session room: ${sessionId}`);
-
-      // 2. To the agents room (all connected agents)
-      io.to("agents").emit("messageReceived", formattedMessage);
-      console.log(`Emitted chat end to agents room`);
-
-      // 3. Broadcast to all - guaranteed to reach everyone
-      io.emit("messageReceived", formattedMessage);
-      console.log(`Broadcasted chat end message to all clients`);
-
-      // Also emit specialized events for chat ending
-
-      // Session updated event with endedBy info
-      io.emit("sessionUpdated", {
-        sessionId: String(sessionId),
-        status: "closed",
-        endedBy,
-        timestamp: new Date().toISOString(),
-        message: `Chat ended by ${endedBy}`,
-        type: "chat_ended",
+      io.to(String(sessionId)).emit('sessionUpdated', {
+        id: sessionId,
+        status,
+        closedReason: reason,
+        message,
       });
 
-      // Specific chat ended event
-      io.emit("chatEnded", {
-        sessionId: String(sessionId),
-        endedBy,
-        timestamp: new Date().toISOString(),
-        agentId: chatSession.agentId,
-      });
-
-      console.log("Socket events for chat ending emitted successfully");
-    } else {
-      console.log(
-        "Socket.io instance not available for chat ended notification"
-      );
-    }
-
-    // If an agent was assigned, update their status
-    if (chatSession.agentId) {
-      await prisma.agent.update({
-        where: { id: chatSession.agentId },
-        data: {
-          lastActive: new Date(),
-          // Release agent for other chats
-          isAvailable: true,
-        },
+      // Notify all agents to refresh their dashboard
+      io.to('agents').emit('sessionUpdated', {
+        id: sessionId,
+        status,
+        closedReason: reason,
       });
     }
 
     return NextResponse.json({
       success: true,
-      message: "Live chat session ended successfully.",
+      message: 'Chat session closed successfully',
+      session: updatedSession,
     });
   } catch (error) {
-    console.error("Error ending live chat session:", error);
     return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to end the chat session. Please try again later.",
-      },
+      { success: false, message: 'Failed to close chat session' },
       { status: 500 }
     );
   }

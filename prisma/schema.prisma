@@ -2,7 +2,11 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["jsonProtocol"]
+  binaryTargets   = ["native", "debian-openssl-3.0.x"]
+  engineType      = "binary"
+  log             = ["error", "warn"]
 }
 
 datasource db {
@@ -51,6 +55,10 @@ model ChatSession {
   metadata     Json?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+  closedAt     DateTime?
+  closedReason String?
+  isAgentTyping Boolean @default(false)
+  isCustomerTyping Boolean @default(false)
 
   @@index([userId])
   @@index([agentId])

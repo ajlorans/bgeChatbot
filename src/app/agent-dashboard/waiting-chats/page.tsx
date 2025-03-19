@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSocket } from "@/contexts/SocketContext";
+import type { ServerToClientEvents, ClientToServerEvents } from "@/lib/socketService";
+import type { Socket } from "socket.io-client";
 
 interface WaitingChatSession {
   id: string;
@@ -14,14 +16,41 @@ interface WaitingChatSession {
   messageCount: number;
 }
 
+interface AlertMessage {
+  type: 'success' | 'error' | 'info';
+  message: string;
+  id: string;
+}
+
 export default function WaitingChatsPage() {
   const router = useRouter();
-  const { socket, isConnected } = useSocket();
+  const socketContext = useSocket();
+  const socket = socketContext?.socket;
+  const isConnected = socketContext?.isConnected || false;
   const [sessions, setSessions] = useState<WaitingChatSession[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [refreshInterval, setRefreshInterval] = useState(15); // seconds
+  const [alerts, setAlerts] = useState<AlertMessage[]>([]);
+  const [refreshInterval, setRefreshInterval] = useState(5); // default 5 seconds
   const [claimingSession, setClaimingSession] = useState<string | null>(null);
+  const [loadTime, setLoadTime] = useState<number>(Date.now());
+
+  // Helper to add alerts
+  const addAlert = (type: 'success' | 'error' | 'info', message: string) => {
+    const id = `alert-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    setAlerts(prev => [...prev, { type, message, id }]);
+    
+    // Auto-dismiss success and info alerts after 5 seconds
+    if (type !== 'error') {
+      setTimeout(() => {
+        setAlerts(prev => prev.filter(alert => alert.id !== id));
+      }, 5000);
+    }
+  };
+  
+  // Dismiss an alert
+  const dismissAlert = (id: string) => {
+    setAlerts(prev => prev.filter(alert => alert.id !== id));
+  };
 
   // Fetch waiting sessions
   useEffect(() => {
@@ -47,9 +76,12 @@ export default function WaitingChatsPage() {
 
         const data = await response.json();
         setSessions(data.sessions);
+        
+        // Update load time to track when we last got data
+        setLoadTime(Date.now());
       } catch (err) {
         console.error("Error fetching waiting sessions:", err);
-        setError("Failed to load waiting sessions");
+        addAlert('error', "Failed to load waiting sessions. Please try refreshing the page.");
       } finally {
         setLoading(false);
       }
@@ -58,11 +90,6 @@ export default function WaitingChatsPage() {
     // Initial fetch
     fetchSessions();
 
-    // Set default to 5 seconds for quicker updates
-    if (refreshInterval > 10) {
-      setRefreshInterval(5);
-    }
-
     // Set up polling
     const intervalId = setInterval(fetchSessions, refreshInterval * 1000);
 
@@ -70,7 +97,7 @@ export default function WaitingChatsPage() {
     return () => clearInterval(intervalId);
   }, [refreshInterval]);
 
-  // Listen for new waiting sessions via socket
+  // Listen for socket events related to waiting sessions
   useEffect(() => {
     if (!socket || !isConnected) return;
 
@@ -83,16 +110,44 @@ export default function WaitingChatsPage() {
         if (prevSessions.some((s) => s.id === session.id)) {
           return prevSessions;
         }
+        
+        // Add notification for new waiting session
+        addAlert('info', `New customer waiting: ${session.customerName || 'Anonymous'}`);
+        
         return [...prevSessions, session];
       });
     };
+    
+    // Handle session claimed by another agent
+    const handleSessionClaimed = (data: { 
+      sessionId: string, 
+      agentId: string, 
+      agentName: string 
+    }) => {
+      if (!data || !data.sessionId) return;
+      
+      // Remove the session from our list if claimed by another agent
+      setSessions((prevSessions) => {
+        const sessionIndex = prevSessions.findIndex(s => s.id === data.sessionId);
+        if (sessionIndex === -1) return prevSessions;
+        
+        const claimedSession = prevSessions[sessionIndex];
+        
+        // Only show alert if session was in our list
+        addAlert('info', `${data.agentName} claimed the chat with ${claimedSession.customerName || 'Anonymous'}`);
+        
+        return prevSessions.filter(s => s.id !== data.sessionId);
+      });
+    };
 
-    // Subscribe to waiting session events
-    socket.on("chat:newWaitingSession", handleNewWaitingSession);
+    // Use type assertion for custom event names not in the type definition
+    (socket as any).on("chat:newWaitingSession", handleNewWaitingSession);
+    (socket as any).on("chat:claimed", handleSessionClaimed);
 
     // Clean up on unmount
     return () => {
-      socket.off("chat:newWaitingSession", handleNewWaitingSession);
+      (socket as any).off("chat:newWaitingSession", handleNewWaitingSession);
+      (socket as any).off("chat:claimed", handleSessionClaimed);
     };
   }, [socket, isConnected]);
 
@@ -129,24 +184,51 @@ export default function WaitingChatsPage() {
         },
       });
 
+      const data = await response.json();
+
+      // If not a successful response, handle the error
       if (!response.ok) {
-        throw new Error("Failed to claim chat session");
+        if (response.status === 409) {
+          addAlert('error', "This chat was already claimed by another agent.");
+          // Remove the session from the list as it's already claimed
+          setSessions((prevSessions) =>
+            prevSessions.filter((session) => session.id !== sessionId)
+          );
+        } else {
+          addAlert('error', data.error || "Failed to claim chat");
+        }
+        setClaimingSession(null);
+        return;
       }
 
-      // Remove the session from the list
+      // If already claimed by this agent, redirect
+      if (data.alreadyClaimed) {
+        addAlert('info', "You have already claimed this session");
+        router.push(`/agent-dashboard/sessions/${sessionId}`);
+        return;
+      }
+
+      // Success - remove the session from list and redirect
       setSessions((prevSessions) =>
         prevSessions.filter((session) => session.id !== sessionId)
       );
+      
+      addAlert('success', "Chat claimed successfully!");
 
       // Redirect to the chat session
       router.push(`/agent-dashboard/sessions/${sessionId}`);
     } catch (err) {
       console.error("Error claiming chat:", err);
-      setError(
-        "Failed to claim chat session. It may have been claimed by another agent."
-      );
+      addAlert('error', "Failed to claim chat session. Please try again.");
       setClaimingSession(null);
     }
+  };
+
+  // Force manual refresh
+  const handleManualRefresh = () => {
+    addAlert('info', "Refreshing waiting sessions...");
+    // Trigger the useEffect by updating the refresh interval
+    setRefreshInterval(prev => prev === 5 ? 4.99 : 5);
   };
 
   return (
@@ -158,10 +240,34 @@ export default function WaitingChatsPage() {
         </p>
       </div>
 
-      {/* Refresh rate selector */}
+      {/* Alert messages */}
+      {alerts.length > 0 && (
+        <div className="mb-4 space-y-2">
+          {alerts.map((alert) => (
+            <div 
+              key={alert.id} 
+              className={`p-3 rounded flex justify-between items-center ${
+                alert.type === 'success' ? 'bg-green-100 text-green-700' : 
+                alert.type === 'error' ? 'bg-red-100 text-red-700' : 
+                'bg-blue-100 text-blue-700'
+              }`}
+            >
+              <span>{alert.message}</span>
+              <button 
+                onClick={() => dismissAlert(alert.id)} 
+                className="ml-2 font-bold text-lg leading-none"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Refresh rate selector and statistics */}
       <div className="mb-4 flex justify-between items-center">
         <div className="flex items-center space-x-2">
-          <span className="text-sm text-gray-900">Refresh rate:</span>
+          <span className="text-sm text-gray-900">Refresh every:</span>
           <select
             value={refreshInterval}
             onChange={(e) => setRefreshInterval(Number(e.target.value))}
@@ -172,26 +278,27 @@ export default function WaitingChatsPage() {
             <option value={30}>30 seconds</option>
             <option value={60}>1 minute</option>
           </select>
-        </div>
-
-        <span className="text-sm text-gray-900">
-          {sessions.length} waiting{" "}
-          {sessions.length === 1 ? "customer" : "customers"}
-        </span>
-      </div>
-
-      {/* Error message */}
-      {error && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded">
-          {error}
-          <button onClick={() => setError("")} className="ml-2 font-bold">
-            ×
+          <button
+            onClick={handleManualRefresh}
+            className="ml-2 p-1 text-sm bg-blue-50 text-blue-600 rounded border border-blue-200 hover:bg-blue-100"
+          >
+            Refresh Now
           </button>
         </div>
-      )}
+
+        <div className="flex items-center space-x-2">
+          <span className="text-sm text-gray-900">
+            {sessions.length} waiting{" "}
+            {sessions.length === 1 ? "customer" : "customers"}
+          </span>
+          <span className="text-xs text-gray-500">
+            Last updated: {new Date(loadTime).toLocaleTimeString()}
+          </span>
+        </div>
+      </div>
 
       {/* Sessions list */}
-      {loading ? (
+      {loading && sessions.length === 0 ? (
         <div className="flex justify-center items-center p-12">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
           <span className="ml-2">Loading waiting sessions...</span>
@@ -273,11 +380,11 @@ export default function WaitingChatsPage() {
                           <div className="text-sm font-medium text-gray-900">
                             {session.customerName || "Anonymous"}
                           </div>
-                          <div className="text-sm text-gray-900">
+                          <div className="text-sm text-gray-500">
                             {session.customerEmail || "No email provided"}
                           </div>
                           {/* Mobile-only info */}
-                          <div className="sm:hidden mt-1 text-xs text-gray-900">
+                          <div className="sm:hidden mt-1 text-xs text-gray-500">
                             <div>Waiting since: {formatTime(session.createdAt)}</div>
                             <div>Time in queue: {getTimeInQueue(session.createdAt)}</div>
                             <div>Messages: {session.messageCount || 0}</div>
@@ -307,7 +414,7 @@ export default function WaitingChatsPage() {
                         className={`${
                           claimingSession === session.id
                             ? "bg-gray-100 text-gray-500 cursor-not-allowed"
-                            : "bg-green-50 text-green-600 hover:text-green-900"
+                            : "bg-green-50 text-green-600 hover:text-green-900 hover:bg-green-100"
                         } px-3 py-1 rounded transition-colors duration-150 w-full sm:w-auto`}
                       >
                         {claimingSession === session.id ? (

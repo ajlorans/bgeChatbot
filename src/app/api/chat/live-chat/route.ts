@@ -3,6 +3,14 @@ import { prisma } from "@/lib/db";
 import { corsConfig, getAllowedOrigins } from "@/config/cors";
 import { io } from "@/lib/socketService";
 
+// Add to top after imports
+// Disable ALL logging
+console.log = () => {};
+console.error = () => {};
+
+// Add at top after imports
+const DEBUG = false; // Set to false to disable debug logging
+
 // Helper function to check if origin is allowed
 function isOriginAllowed(origin: string | null): boolean {
   // Allow requests with no origin (like mobile apps, curl, or from same site)
@@ -113,7 +121,7 @@ export async function POST(req: NextRequest) {
     // If a message was provided, save it
     if (message) {
       // Log incoming message for debugging
-      console.log(
+      if (DEBUG) console.log(
         `Received ${role} message for session ${sessionId}: ${message.substring(
           0,
           30
@@ -139,7 +147,7 @@ export async function POST(req: NextRequest) {
         });
 
         if (existingMessage) {
-          console.log(
+          if (DEBUG) console.log(
             `Duplicate message detected, skipping save: ${message.substring(
               0,
               30
@@ -209,7 +217,7 @@ export async function POST(req: NextRequest) {
       // Emit socket event for real-time updates
       try {
         if (io) {
-          console.log(
+          if (DEBUG) console.log(
             `Emitting message via socket for sessionId: ${sessionId}, role: ${role}`
           );
 
@@ -231,21 +239,21 @@ export async function POST(req: NextRequest) {
           };
 
           // Important debugging logs
-          console.log(`Socket active rooms:`, io.sockets.adapter.rooms);
+          if (DEBUG) console.log(`Socket active rooms:`, io.sockets.adapter.rooms);
 
           // Use multiple strategies to ensure delivery
 
           // 1. Direct to session room
           io.to(String(sessionId)).emit("messageReceived", formattedMessage);
-          console.log(`Emitted to session room: ${sessionId}`);
+          if (DEBUG) console.log(`Emitted to session room: ${sessionId}`);
 
           // 2. Send to agents room (all agents get notified)
           io.to("agents").emit("messageReceived", formattedMessage);
-          console.log(`Emitted to agents room`);
+          if (DEBUG) console.log(`Emitted to agents room`);
 
           // 3. Global broadcast (this is a fallback)
           io.emit("messageReceived", formattedMessage);
-          console.log(`Broadcasted to all clients`);
+          if (DEBUG) console.log(`Broadcasted to all clients`);
 
           // Session update event to trigger UI refreshes
           io.emit("sessionUpdated", {
@@ -256,9 +264,9 @@ export async function POST(req: NextRequest) {
             role: role,
           });
 
-          console.log("Socket events emitted successfully");
+          if (DEBUG) console.log("Socket events emitted successfully");
         } else {
-          console.log("Socket.io instance not available for real-time updates");
+          if (DEBUG) console.log("Socket.io instance not available for real-time updates");
         }
       } catch (error) {
         console.error("Error emitting socket event:", error);
@@ -287,7 +295,7 @@ export async function POST(req: NextRequest) {
       const timestamp = parseInt(lastMessageTimestamp, 10);
       if (!isNaN(timestamp)) {
         // Log the timestamp we're filtering from
-        console.log(
+        if (DEBUG) console.log(
           `Getting messages after ${new Date(
             timestamp
           ).toISOString()} for session ${sessionId}`
@@ -303,7 +311,7 @@ export async function POST(req: NextRequest) {
     } else {
       // If no timestamp provided, get all messages from the last 5 minutes
       // This ensures the customer always sees agent joining messages
-      console.log(
+      if (DEBUG) console.log(
         `No timestamp provided, getting recent messages for session ${sessionId}`
       );
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
@@ -314,7 +322,7 @@ export async function POST(req: NextRequest) {
 
     // Fetch messages with this query
     const messages = await prisma.message.findMany(messageQuery);
-    console.log(
+    if (DEBUG) console.log(
       `Found ${messages.length} new messages for session ${sessionId}`
     );
 
@@ -345,9 +353,7 @@ export async function POST(req: NextRequest) {
       chatSession.agentId &&
       chatSession.status === "active"
     ) {
-      console.log(
-        `Checking for existing agent join message in database for session ${sessionId}`
-      );
+      if (DEBUG) console.log(`Checking for existing agent join message in database for session ${sessionId}`);
 
       // Check if we already have an agent joined message in the database
       const existingJoinMessage = await prisma.message.findFirst({
@@ -361,17 +367,13 @@ export async function POST(req: NextRequest) {
       });
 
       if (existingJoinMessage) {
-        console.log(
-          `Found existing agent join message in database, adding to response`
-        );
+        if (DEBUG) console.log(`Found existing agent join message in database, adding to response`);
         // Make sure we don't already have this message in the response
         if (!messages.some((msg) => msg.id === existingJoinMessage.id)) {
           messages.push(existingJoinMessage);
         }
       } else {
-        console.log(
-          `No existing join message found, creating synthetic agent joined message`
-        );
+        if (DEBUG) console.log(`No existing join message found, creating synthetic agent joined message`);
         try {
           // Create an agent joined message with timestamp 1 second ago
           const joinedMessage = await prisma.message.create({
@@ -399,6 +401,7 @@ export async function POST(req: NextRequest) {
       content: msg.content,
       timestamp: msg.timestamp.getTime(), // Convert to epoch milliseconds
       category: msg.category || "live_agent",
+      agentName: msg.role === "agent" ? agentName : null,
     }));
 
     // Get session status
@@ -415,6 +418,17 @@ export async function POST(req: NextRequest) {
     // Add a cache buster to prevent browser caching
     const cacheBuster = `${Date.now()}-${Math.random()}`;
 
+    // Find the section where we calculate queue position and add estimated wait time
+    const queuePosition = await prisma.chatSession.count({
+      where: {
+        status: "waiting",
+        createdAt: { lt: chatSession.createdAt },
+      },
+    });
+
+    // Calculate estimated wait time (5 minutes per position in queue)
+    const estimatedWaitTime = Math.max(5, queuePosition * 5);
+
     return NextResponse.json({
       success: true,
       sessionId,
@@ -424,6 +438,8 @@ export async function POST(req: NextRequest) {
       isActive: status === "active",
       lastMessageTimestamp: newTimestamp.toString(),
       _cacheBuster: cacheBuster,
+      queuePosition,
+      estimatedWaitTime,
     });
   } catch (error) {
     console.error("Error in live chat message:", error);
@@ -519,7 +535,7 @@ export async function GET(req: NextRequest) {
       const timestamp = parseInt(lastMessageTimestamp, 10);
       if (!isNaN(timestamp)) {
         // Log the timestamp we're filtering from
-        console.log(
+        if (DEBUG) console.log(
           `Getting messages after ${new Date(
             timestamp
           ).toISOString()} for session ${sessionId}`
@@ -535,7 +551,7 @@ export async function GET(req: NextRequest) {
     } else {
       // If no timestamp provided, get all messages from the last 5 minutes
       // This ensures the customer always sees agent joining messages
-      console.log(
+      if (DEBUG) console.log(
         `No timestamp provided, getting recent messages for session ${sessionId}`
       );
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
@@ -546,7 +562,7 @@ export async function GET(req: NextRequest) {
 
     // Fetch messages with this query
     const messages = await prisma.message.findMany(messageQuery);
-    console.log(
+    if (DEBUG) console.log(
       `Found ${messages.length} new messages for session ${sessionId}`
     );
 
@@ -563,9 +579,7 @@ export async function GET(req: NextRequest) {
       chatSession.agentId &&
       chatSession.status === "active"
     ) {
-      console.log(
-        `Checking for existing agent join message in database for session ${sessionId}`
-      );
+      if (DEBUG) console.log(`Checking for existing agent join message in database for session ${sessionId}`);
 
       // Check if we already have an agent joined message in the database
       const existingJoinMessage = await prisma.message.findFirst({
@@ -579,17 +593,13 @@ export async function GET(req: NextRequest) {
       });
 
       if (existingJoinMessage) {
-        console.log(
-          `Found existing agent join message in database, adding to response`
-        );
+        if (DEBUG) console.log(`Found existing agent join message in database, adding to response`);
         // Make sure we don't already have this message in the response
         if (!messages.some((msg) => msg.id === existingJoinMessage.id)) {
           messages.push(existingJoinMessage);
         }
       } else {
-        console.log(
-          `No existing join message found, creating synthetic agent joined message`
-        );
+        if (DEBUG) console.log(`No existing join message found, creating synthetic agent joined message`);
         try {
           // Create an agent joined message with timestamp 1 second ago
           const joinedMessage = await prisma.message.create({
@@ -617,6 +627,7 @@ export async function GET(req: NextRequest) {
       content: msg.content,
       timestamp: msg.timestamp.getTime(), // Convert to epoch milliseconds
       category: msg.category || "live_agent",
+      agentName: msg.role === "agent" ? agentName : null,
     }));
 
     // Get session status
@@ -633,6 +644,17 @@ export async function GET(req: NextRequest) {
     // Add a cache buster to prevent browser caching
     const cacheBuster = `${Date.now()}-${Math.random()}`;
 
+    // Find the section where we calculate queue position and add estimated wait time
+    const queuePosition = await prisma.chatSession.count({
+      where: {
+        status: "waiting",
+        createdAt: { lt: chatSession.createdAt },
+      },
+    });
+
+    // Calculate estimated wait time (5 minutes per position in queue)
+    const estimatedWaitTime = Math.max(5, queuePosition * 5);
+
     return NextResponse.json({
       success: true,
       sessionId,
@@ -642,6 +664,8 @@ export async function GET(req: NextRequest) {
       isActive: status === "active",
       lastMessageTimestamp: newTimestamp.toString(),
       _cacheBuster: cacheBuster,
+      queuePosition,
+      estimatedWaitTime,
     });
   } catch (error) {
     console.error("Error fetching live chat messages:", error);

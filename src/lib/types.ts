@@ -6,6 +6,13 @@ export interface Message {
   content: string;
   timestamp: number;
   category?: ChatCategory;
+  agentName?: string;
+  metadata?: any;
+  receivedAt?: number;
+  isAgent?: boolean;
+  isSystem?: boolean;
+  sender?: string;
+  chatSessionId?: string;
 }
 
 export interface ChatSession {
