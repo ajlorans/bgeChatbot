@@ -129,7 +129,7 @@ export async function PATCH(
     }
 
     // Validate the requested status
-    if (!["active", "waiting", "closed"].includes(status)) {
+    if (!["active", "waiting", "closed", "ended"].includes(status)) {
       return NextResponse.json(
         { error: "Invalid status value" },
         { status: 400 }
@@ -147,6 +147,19 @@ export async function PATCH(
         }),
       },
     });
+
+    // If status is "ended", add a system message
+    if (status === "ended") {
+      await prisma.message.create({
+        data: {
+          sessionId,
+          role: "system",
+          content: "Chat session ended by agent.",
+          timestamp: new Date(),
+          category: "live_agent",
+        },
+      });
+    }
 
     // Return updated session
     return NextResponse.json({

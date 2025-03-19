@@ -20,6 +20,7 @@ import {
   sanitizeOrderNumber,
   sanitizeEmail,
 } from "@/lib/sanitizer";
+import { Message } from "@/lib/types";
 
 interface ChatbotProps {
   initialMessage?: string;
@@ -167,8 +168,11 @@ const Chatbot: React.FC<ChatbotProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [customerEmail, setCustomerEmail] = useState("");
+  const [customerName, setCustomerName] = useState("");
   const [emailError, setEmailError] = useState("");
+  const [nameError, setNameError] = useState("");
   const [showEmailInput, setShowEmailInput] = useState(false);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const {
     messages,
@@ -299,19 +303,28 @@ const Chatbot: React.FC<ChatbotProps> = ({
   // Handle submitting the email for live agent
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    let hasError = false;
+
+    if (!customerName) {
+      setNameError("Please enter your name");
+      hasError = true;
+    } else {
+      setNameError("");
+    }
 
     if (!customerEmail) {
       setEmailError("Please enter your email address");
-      return;
-    }
-
-    if (!validateEmail(customerEmail)) {
+      hasError = true;
+    } else if (!validateEmail(customerEmail)) {
       setEmailError("Please enter a valid email address");
-      return;
+      hasError = true;
+    } else {
+      setEmailError("");
     }
 
-    setEmailError("");
-    await requestLiveAgent(customerEmail);
+    if (hasError) return;
+
+    await requestLiveAgent(customerEmail, customerName);
     setShowEmailInput(false);
   };
 
@@ -325,16 +338,26 @@ const Chatbot: React.FC<ChatbotProps> = ({
   const renderLiveChatStatus = () => {
     if (!isLiveChat) return null;
 
-    if (liveChatStatus === "queued") {
+    if (liveChatStatus === "queued" || liveChatStatus === "waiting") {
       return (
         <div className="flex items-center p-2 bg-yellow-50 border-y border-yellow-200">
           <ClockIcon className="w-5 h-5 mr-2 text-yellow-500" />
           <span className="text-sm">
-            Waiting for an agent
-            {liveChatDetails?.queuePosition &&
-              ` (#${liveChatDetails.queuePosition} in queue)`}
-            {liveChatDetails?.estimatedWaitTime &&
-              ` - Est. wait: ~${liveChatDetails.estimatedWaitTime} min`}
+            <span className="font-medium">Waiting for an agent...</span>
+            {liveChatDetails &&
+              liveChatDetails.queuePosition &&
+              liveChatDetails.queuePosition > 0 && (
+                <span className="block mt-1">
+                  Position in queue: #{liveChatDetails.queuePosition}
+                </span>
+              )}
+            {liveChatDetails &&
+              liveChatDetails.estimatedWaitTime &&
+              liveChatDetails.estimatedWaitTime > 0 && (
+                <span className="block mt-1">
+                  Estimated wait time: ~{liveChatDetails.estimatedWaitTime} min
+                </span>
+              )}
           </span>
         </div>
       );
@@ -368,18 +391,29 @@ const Chatbot: React.FC<ChatbotProps> = ({
     return (
       <div className="p-4 bg-white border-t border-gray-200">
         <form onSubmit={handleEmailSubmit} className="space-y-2">
-          <p className="text-sm text-gray-600">
-            Please provide your email address so our agent can assist you
-            better:
+          <p className="text-sm text-gray-700">
+            Please provide your information so our agent can assist you better:
           </p>
-          <input
-            type="email"
-            value={customerEmail}
-            onChange={(e) => setCustomerEmail(e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded"
-            placeholder="your.email@example.com"
-          />
-          {emailError && <p className="text-xs text-red-500">{emailError}</p>}
+          <div className="mb-2">
+            <input
+              type="text"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded text-gray-800"
+              placeholder="Your name"
+            />
+            {nameError && <p className="text-xs text-red-500">{nameError}</p>}
+          </div>
+          <div className="mb-2">
+            <input
+              type="email"
+              value={customerEmail}
+              onChange={(e) => setCustomerEmail(e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded text-gray-800"
+              placeholder="your.email@example.com"
+            />
+            {emailError && <p className="text-xs text-red-500">{emailError}</p>}
+          </div>
           <div className="flex justify-end space-x-2">
             <button
               type="button"
@@ -511,6 +545,18 @@ const Chatbot: React.FC<ChatbotProps> = ({
     );
   };
 
+  // Listen for socket events directly
+  useEffect(() => {
+    // Clean up on unmount
+    return () => {
+      // Ensure polling stops when component unmounts
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, []);
+
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end">
       {/* Chat button - only show when chat is closed */}
@@ -564,56 +610,96 @@ const Chatbot: React.FC<ChatbotProps> = ({
 
           {/* Messages */}
           <div className="flex-1 p-5 overflow-y-auto bg-gray-50">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${
-                  message.role === "user" ? "justify-end" : "justify-start"
-                } mb-3`}
-              >
-                {message.role !== "user" && message.role !== "system" && (
+            {messages
+              .reduce<Message[]>(
+                (
+                  uniqueMessages: Message[],
+                  message: Message,
+                  index: number,
+                  array: Message[]
+                ) => {
+                  const prevMessage = index > 0 ? array[index - 1] : null;
+                  if (
+                    prevMessage &&
+                    prevMessage.role === message.role &&
+                    prevMessage.content === message.content
+                  ) {
+                    // Handle timestamps that could be either strings or numbers
+                    const getTimestamp = (ts: number | string): number => {
+                      if (typeof ts === "number") return ts;
+                      try {
+                        const parsed = Date.parse(ts as string);
+                        return isNaN(parsed) ? Date.now() : parsed;
+                      } catch {
+                        return Date.now();
+                      }
+                    };
+
+                    const prevTime = getTimestamp(prevMessage.timestamp);
+                    const currTime = getTimestamp(message.timestamp);
+
+                    if (Math.abs(prevTime - currTime) < 3000) {
+                      console.log(
+                        "Skipping duplicate message:",
+                        message.content
+                      );
+                      return uniqueMessages;
+                    }
+                  }
+                  return [...uniqueMessages, message];
+                },
+                []
+              )
+              .map((message, index) => (
+                <div
+                  key={`${message.id}-${index}`}
+                  className={`flex ${
+                    message.role === "user" ? "justify-end" : "justify-start"
+                  } mb-3`}
+                >
+                  {message.role !== "user" && message.role !== "system" && (
+                    <div
+                      className="flex items-center justify-center w-8 h-8 mr-2 text-white rounded-full"
+                      style={{ backgroundColor: primaryColor }}
+                    >
+                      {message.role === "agent" ? (
+                        <UserIcon className="w-5 h-5" />
+                      ) : (
+                        <ChatBubbleLeftRightIcon className="w-5 h-5" />
+                      )}
+                    </div>
+                  )}
+
                   <div
-                    className="flex items-center justify-center w-8 h-8 mr-2 text-white rounded-full"
-                    style={{ backgroundColor: primaryColor }}
+                    className={`max-w-[80%] px-4 py-2 rounded-lg ${
+                      message.role === "user"
+                        ? "bg-blue-500 text-white rounded-br-none"
+                        : message.role === "system"
+                        ? "bg-gray-200 text-gray-700"
+                        : message.role === "agent"
+                        ? "bg-green-100 text-gray-800 rounded-bl-none border border-green-200"
+                        : "bg-gray-100 text-gray-800 rounded-bl-none"
+                    }`}
                   >
-                    {message.role === "agent" ? (
-                      <UserIcon className="w-5 h-5" />
+                    {message.role === "system" ? (
+                      <p className="text-sm italic">{message.content}</p>
+                    ) : message.role === "agent" ||
+                      message.role === "assistant" ? (
+                      <div className="prose prose-sm">
+                        {renderMessage(message.content, message.category)}
+                      </div>
                     ) : (
-                      <ChatBubbleLeftRightIcon className="w-5 h-5" />
+                      <p>{message.content}</p>
                     )}
                   </div>
-                )}
 
-                <div
-                  className={`max-w-[80%] px-4 py-2 rounded-lg ${
-                    message.role === "user"
-                      ? "bg-blue-500 text-white rounded-br-none"
-                      : message.role === "system"
-                      ? "bg-gray-200 text-gray-700"
-                      : message.role === "agent"
-                      ? "bg-green-100 text-gray-800 rounded-bl-none border border-green-200"
-                      : "bg-gray-100 text-gray-800 rounded-bl-none"
-                  }`}
-                >
-                  {message.role === "system" ? (
-                    <p className="text-sm italic">{message.content}</p>
-                  ) : message.role === "agent" ||
-                    message.role === "assistant" ? (
-                    <div className="prose prose-sm">
-                      {renderMessage(message.content, message.category)}
+                  {message.role === "user" && (
+                    <div className="flex items-center justify-center w-8 h-8 ml-2 text-white bg-blue-500 rounded-full">
+                      <UserIcon className="w-5 h-5" />
                     </div>
-                  ) : (
-                    <p>{message.content}</p>
                   )}
                 </div>
-
-                {message.role === "user" && (
-                  <div className="flex items-center justify-center w-8 h-8 ml-2 text-white bg-blue-500 rounded-full">
-                    <UserIcon className="w-5 h-5" />
-                  </div>
-                )}
-              </div>
-            ))}
+              ))}
 
             {/* Order Status Form */}
             {showOrderStatusForm && (

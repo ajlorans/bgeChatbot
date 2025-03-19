@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { corsConfig, getAllowedOrigins } from "@/config/cors";
 import { LiveChatRequest, LiveChatStatus, Message } from "@/lib/types";
+import { v4 as uuidv4 } from "uuid";
 
 // CORS middleware for the chat API
 export async function OPTIONS(req: NextRequest) {
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { sessionId, customerEmail, issue, messages } =
+    const { sessionId, customerEmail, customerName, issue, messages } =
       (await req.json()) as LiveChatRequest & {
         messages: Message[];
       };
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
 
     let chatSession;
     const hasAvailableAgent = availableAgents.length > 0;
-    const status: LiveChatStatus = hasAvailableAgent ? "active" : "queued";
+    const status: LiveChatStatus = "waiting"; // Always use "waiting" status initially
 
     // Create or update the chat session
     if (sessionId) {
@@ -73,8 +74,9 @@ export async function POST(req: NextRequest) {
             isLiveChat: true,
             status,
             customerEmail,
+            customerName,
             metadata: metadata ? JSON.stringify(metadata) : undefined,
-            agentId: hasAvailableAgent ? availableAgents[0].id : null,
+            agentId: null, // Always set to null so agent needs to claim it
             updatedAt: new Date(),
           },
         });
@@ -114,8 +116,9 @@ export async function POST(req: NextRequest) {
             isLiveChat: true,
             status,
             customerEmail,
+            customerName,
             metadata: metadata ? JSON.stringify(metadata) : undefined,
-            agentId: hasAvailableAgent ? availableAgents[0].id : null,
+            agentId: null, // Always set to null so agent needs to claim it
             messages: {
               create: {
                 role: "system",
@@ -138,8 +141,9 @@ export async function POST(req: NextRequest) {
           isLiveChat: true,
           status,
           customerEmail,
+          customerName,
           metadata: metadata ? JSON.stringify(metadata) : undefined,
-          agentId: hasAvailableAgent ? availableAgents[0].id : null,
+          agentId: null, // Always set to null so agent needs to claim it
           messages: {
             create: {
               role: "system",
@@ -173,7 +177,7 @@ export async function POST(req: NextRequest) {
 
     // Create a user-friendly response
     const responseMessage = hasAvailableAgent
-      ? "You're now connected with a live agent. Please give them a moment to review your conversation."
+      ? "Your request has been received. An agent will be with you shortly. Please wait."
       : "Thank you for your request. All our agents are currently busy. You've been added to the queue and an agent will assist you as soon as possible.";
 
     return NextResponse.json({
@@ -202,7 +206,7 @@ export async function POST(req: NextRequest) {
 async function getQueuePosition(sessionId: string): Promise<number> {
   const queuedSessions = await prisma.chatSession.findMany({
     where: {
-      status: "queued",
+      status: "waiting",
     },
     orderBy: {
       createdAt: "asc", // First come, first served
@@ -228,7 +232,7 @@ async function calculateEstimatedWaitTime(): Promise<number> {
   // Get count of queued sessions
   const queuedSessionsCount = await prisma.chatSession.count({
     where: {
-      status: "queued",
+      status: "waiting",
     },
   });
 

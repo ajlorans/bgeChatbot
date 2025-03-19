@@ -109,7 +109,7 @@ export default function HistoryPage() {
   };
 
   return (
-    <div className="container mx-auto">
+    <div className="container mx-auto h-full min-h-[calc(100vh-12rem)] overflow-y-auto pb-24">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-gray-800">Chat History</h1>
         <p className="text-sm text-gray-500">
@@ -182,7 +182,7 @@ export default function HistoryPage() {
       ) : sessions.length === 0 ? (
         <div className="bg-white p-8 rounded-lg shadow text-center">
           <svg
-            className="mx-auto h-12 w-12 text-gray-400"
+            className="mx-auto h-12 w-12 text-gray-500"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -323,7 +323,7 @@ export default function HistoryPage() {
                       disabled={pagination.page === 1}
                       className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${
                         pagination.page === 1
-                          ? "text-gray-300 cursor-not-allowed"
+                          ? "text-gray-500 cursor-not-allowed"
                           : "text-gray-500 hover:bg-gray-50"
                       }`}
                     >
@@ -376,7 +376,7 @@ export default function HistoryPage() {
                       disabled={pagination.page === pagination.totalPages}
                       className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${
                         pagination.page === pagination.totalPages
-                          ? "text-gray-300 cursor-not-allowed"
+                          ? "text-gray-500 cursor-not-allowed"
                           : "text-gray-500 hover:bg-gray-50"
                       }`}
                     >

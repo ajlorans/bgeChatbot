@@ -22,26 +22,46 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "10");
     const skip = (page - 1) * limit;
 
+    console.log(
+      `Fetching sessions with status: ${status} for agent ${session.user.agentId}`
+    );
+
     // Build the where clause based on status
-    const where = {
-      ...(status === "active"
-        ? {
-            status: "active",
-            agentId: session.user.agentId,
-          }
-        : status === "waiting"
-        ? {
-            status: "waiting",
-          }
-        : status === "closed"
-        ? {
-            status: "closed",
-            agentId: session.user.agentId,
-          }
-        : {
-            agentId: session.user.agentId,
-          }),
-    };
+    let where = {};
+
+    if (status === "active") {
+      where = {
+        status: "active",
+        agentId: session.user.agentId,
+        NOT: { agentId: null },
+      };
+      console.log("Active filter:", JSON.stringify(where));
+    } else if (status === "waiting") {
+      where = {
+        status: "waiting",
+        agentId: null,
+      };
+      console.log("Waiting filter:", JSON.stringify(where));
+    } else if (status === "closed") {
+      where = {
+        status: { in: ["closed", "ended"] },
+        agentId: session.user.agentId,
+      };
+    } else {
+      where = {
+        OR: [
+          {
+            AND: [
+              { agentId: session.user.agentId },
+              { status: { not: "waiting" } },
+            ],
+          },
+          {
+            AND: [{ status: "waiting" }, { agentId: null }],
+          },
+        ],
+      };
+    }
 
     // Fetch sessions with the latest message for each
     const chatSessions = await prisma.chatSession.findMany({

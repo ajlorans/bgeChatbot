@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSocket } from "@/contexts/SocketContext";
+import { ClockIcon } from "@heroicons/react/24/outline";
 
 interface RecentMessage {
   id: string;
@@ -438,7 +439,7 @@ export default function ActiveChatsPage() {
                             </p>
                           ))
                       ) : (
-                        <p className="text-sm text-gray-400 italic">
+                        <p className="text-sm text-gray-600 italic">
                           No customer messages yet
                         </p>
                       )}
@@ -448,7 +449,7 @@ export default function ActiveChatsPage() {
                     <div className="text-sm text-gray-500">
                       {getTimeElapsed(session.updatedAt)}
                     </div>
-                    <div className="text-xs text-gray-400">
+                    <div className="text-xs text-gray-600">
                       {formatTime(session.updatedAt)}
                     </div>
                   </td>

@@ -5,6 +5,9 @@ import { parse } from "cookie";
 import jwt from "jsonwebtoken";
 import { prisma } from "./db";
 
+// Singleton instance of Socket.IO server
+export let io: Server | null = null;
+
 export type NextApiResponseWithSocket = NextApiResponse & {
   socket: {
     server: NextServer & {
@@ -17,6 +20,7 @@ export type NextApiResponseWithSocket = NextApiResponse & {
 export interface ServerToClientEvents {
   noArg: () => void;
   messageReceived: (message: any) => void;
+  newMessage: (message: any) => void;
   sessionUpdated: (session: any) => void;
   error: (error: string) => void;
   agentTyping: (data: { sessionId: string; isTyping: boolean }) => void;
@@ -52,222 +56,272 @@ export interface SocketData {
 // JWT verification
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
-// Initialize Socket.IO server
+// Initialize with socket.io server
 export const initSocketServer = (
   req: NextApiRequest,
   res: NextApiResponseWithSocket
 ) => {
-  if (!res.socket.server.io) {
-    console.log("Initializing Socket.IO server...");
-    const io = new Server<
-      ClientToServerEvents,
-      ServerToClientEvents,
-      InterServerEvents,
-      SocketData
-    >(res.socket.server, {
-      path: "/api/socket",
-      cors: {
-        origin: "*",
-        methods: ["GET", "POST"],
-      },
+  // If socket.io server is already initialized, do nothing
+  if (res.socket.server.io) {
+    console.log("Socket.io already running, reusing existing instance");
+    io = res.socket.server.io;
+    return res;
+  }
+
+  console.log("Initializing Socket.io server from scratch");
+  const ioServer = new Server<
+    ClientToServerEvents,
+    ServerToClientEvents,
+    InterServerEvents,
+    SocketData
+  >(res.socket.server as any, {
+    path: "/api/socket",
+    addTrailingSlash: false,
+    // Enable CORS for all origins
+    cors: {
+      origin: "*",
+      methods: ["GET", "POST"],
+      credentials: true,
+    },
+  });
+
+  res.socket.server.io = ioServer;
+  io = ioServer;
+
+  // Debug sockets on connect to track session/agent connections
+  ioServer.on("connection", (socket) => {
+    console.log(`🔌 Socket connected: ${socket.id}`);
+
+    // Log all connected sockets on server
+    console.log(`💻 Total connected sockets: ${ioServer.engine.clientsCount}`);
+
+    // Auto-join the socket to a notification room based on role
+    if (socket.data.user?.agentId) {
+      socket.join("agents");
+      console.log(`👮 Agent ${socket.data.user.agentId} joined agents room`);
+    } else {
+      socket.join("customers");
+      console.log(`👨 Customer joined customers room`);
+    }
+
+    // Log disconnect events
+    socket.on("disconnect", (reason) => {
+      console.log(`🔌 Socket disconnected: ${socket.id}, reason: ${reason}`);
+    });
+  });
+
+  // Middleware for authentication
+  io.use(async (socket, next) => {
+    const cookies = socket.handshake.headers.cookie;
+    if (!cookies) {
+      return next(new Error("Authentication error"));
+    }
+
+    const parsedCookies = parse(cookies);
+    const token = parsedCookies.agent_token || parsedCookies.token;
+
+    if (!token) {
+      return next(new Error("Authentication error"));
+    }
+
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+
+      // Check if user exists
+      const user = await prisma.user.findUnique({
+        where: {
+          id: decoded.user?.id,
+        },
+        include: {
+          agent: true,
+        },
+      });
+
+      if (!user) {
+        return next(new Error("User not found"));
+      }
+
+      // Attach user data to socket
+      socket.data.user = {
+        id: decoded.user?.id,
+        role: user.role,
+        agentId: user.agent?.id,
+      };
+
+      next();
+    } catch (error) {
+      return next(new Error("Authentication error"));
+    }
+  });
+
+  // Handle connections
+  io.on("connection", (socket) => {
+    console.log(`Socket connected: ${socket.id}`);
+
+    // Debug socket rooms
+    const logRooms = () => {
+      const rooms = Array.from(socket.rooms);
+      console.log(`Socket ${socket.id} is in rooms:`, rooms);
+
+      // Log all active rooms
+      const allRooms = io.sockets.adapter.rooms;
+      console.log("All active rooms:", Array.from(allRooms.keys()));
+    };
+
+    // Initial room logging
+    logRooms();
+
+    // Join a specific chat session
+    socket.on("joinSession", (sessionId) => {
+      // Convert sessionId to string to ensure it works as a room name
+      const roomId = String(sessionId);
+      socket.join(roomId);
+      console.log(`User ${socket.data.user.id} joined session ${roomId}`);
+
+      // Log active rooms after joining
+      logRooms();
     });
 
-    // Save the io instance to the server object
-    res.socket.server.io = io;
+    // Leave a specific chat session
+    socket.on("leaveSession", (sessionId) => {
+      // Convert sessionId to string to ensure it works as a room name
+      const roomId = String(sessionId);
+      socket.leave(roomId);
+      console.log(`User ${socket.data.user.id} left session ${roomId}`);
 
-    // Also make it globally available for API routes to use
-    (global as any).io = io;
+      // Log active rooms after leaving
+      logRooms();
+    });
 
-    // Middleware for authentication
-    io.use(async (socket, next) => {
-      const cookies = socket.handshake.headers.cookie;
-      if (!cookies) {
-        return next(new Error("Authentication error"));
-      }
-
-      const parsedCookies = parse(cookies);
-      const token = parsedCookies.agent_token || parsedCookies.token;
-
-      if (!token) {
-        return next(new Error("Authentication error"));
-      }
-
+    // Send a message
+    socket.on("sendMessage", async (data) => {
       try {
-        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        const { sessionId, content, type = "text" } = data;
+        const userId = socket.data.user.id;
+        const isAgent = !!socket.data.user.agentId;
 
-        // Check if user exists
-        const user = await prisma.user.findUnique({
-          where: {
-            id: decoded.user?.id,
-          },
-          include: {
-            agent: true,
+        // Verify the session exists
+        const session = await prisma.chatSession.findUnique({
+          where: { id: sessionId },
+        });
+
+        if (!session) {
+          socket.emit("error", "Session not found");
+          return;
+        }
+
+        // Create the message
+        const message = await prisma.message.create({
+          data: {
+            content,
+            type,
+            role: isAgent ? "agent" : "customer",
+            userId,
+            chatSessionId: sessionId,
+            timestamp: new Date(),
           },
         });
 
-        if (!user) {
-          return next(new Error("User not found"));
+        // Update session's last activity
+        await prisma.chatSession.update({
+          where: { id: sessionId },
+          data: { updatedAt: new Date() },
+        });
+
+        // If this is an agent, update their last active timestamp
+        if (isAgent && socket.data.user.agentId) {
+          await prisma.agent.update({
+            where: { id: socket.data.user.agentId },
+            data: { lastActive: new Date() },
+          });
         }
 
-        // Attach user data to socket
-        socket.data.user = {
-          id: decoded.user?.id,
-          role: user.role,
-          agentId: user.agent?.id,
-        };
-
-        next();
+        // Broadcast the message to everyone in the session
+        io.to(sessionId).emit("messageReceived", message);
       } catch (error) {
-        return next(new Error("Authentication error"));
+        console.error("Error sending message via socket:", error);
+        socket.emit("error", "Failed to send message");
       }
     });
 
-    // Handle connections
-    io.on("connection", (socket) => {
-      console.log(`Socket connected: ${socket.id}`);
+    // Typing indicator
+    socket.on("typing", (data) => {
+      const { sessionId, isTyping } = data;
+      const isAgent = !!socket.data.user.agentId;
 
-      // Join a specific chat session
-      socket.on("joinSession", (sessionId) => {
-        socket.join(sessionId);
-        console.log(`User ${socket.data.user.id} joined session ${sessionId}`);
-      });
-
-      // Leave a specific chat session
-      socket.on("leaveSession", (sessionId) => {
-        socket.leave(sessionId);
-        console.log(`User ${socket.data.user.id} left session ${sessionId}`);
-      });
-
-      // Send a message
-      socket.on("sendMessage", async (data) => {
-        try {
-          const { sessionId, content, type = "text" } = data;
-          const userId = socket.data.user.id;
-          const isAgent = !!socket.data.user.agentId;
-
-          // Verify the session exists
-          const session = await prisma.chatSession.findUnique({
-            where: { id: sessionId },
-          });
-
-          if (!session) {
-            socket.emit("error", "Session not found");
-            return;
-          }
-
-          // Create the message
-          const message = await prisma.message.create({
-            data: {
-              content,
-              type,
-              role: isAgent ? "agent" : "customer",
-              userId,
-              chatSessionId: sessionId,
-              timestamp: new Date(),
-            },
-          });
-
-          // Update session's last activity
-          await prisma.chatSession.update({
-            where: { id: sessionId },
-            data: { updatedAt: new Date() },
-          });
-
-          // If this is an agent, update their last active timestamp
-          if (isAgent && socket.data.user.agentId) {
-            await prisma.agent.update({
-              where: { id: socket.data.user.agentId },
-              data: { lastActive: new Date() },
-            });
-          }
-
-          // Broadcast the message to everyone in the session
-          io.to(sessionId).emit("messageReceived", message);
-        } catch (error) {
-          console.error("Error sending message via socket:", error);
-          socket.emit("error", "Failed to send message");
-        }
-      });
-
-      // Typing indicator
-      socket.on("typing", (data) => {
-        const { sessionId, isTyping } = data;
-        const isAgent = !!socket.data.user.agentId;
-
-        if (isAgent) {
-          // Broadcast agent typing to the session (except the sender)
-          socket.to(sessionId).emit("agentTyping", { sessionId, isTyping });
-        } else {
-          // Broadcast customer typing to the session (except the sender)
-          socket.to(sessionId).emit("customerTyping", { sessionId, isTyping });
-        }
-      });
-
-      // Mark messages as read
-      socket.on("markRead", async (data) => {
-        try {
-          const { sessionId, messageIds } = data;
-
-          // Update the messages
-          await prisma.message.updateMany({
-            where: {
-              id: { in: messageIds },
-              chatSessionId: sessionId,
-            },
-            data: {
-              isRead: true,
-              readAt: new Date(),
-            },
-          });
-        } catch (error) {
-          console.error("Error marking messages as read:", error);
-          socket.emit("error", "Failed to mark messages as read");
-        }
-      });
-
-      // Update agent status
-      socket.on("updateStatus", async (data) => {
-        try {
-          const { status } = data;
-          const agentId = socket.data.user.agentId;
-
-          if (!agentId) {
-            socket.emit("error", "Not authorized as an agent");
-            return;
-          }
-
-          // Validate status
-          const validStatuses = ["active", "away", "offline"];
-          if (!validStatuses.includes(status)) {
-            socket.emit("error", "Invalid status");
-            return;
-          }
-
-          // Update the agent's status
-          await prisma.agent.update({
-            where: { id: agentId },
-            data: {
-              status,
-              lastActive: new Date(),
-            },
-          });
-
-          // Broadcast status change to all connected clients
-          io.emit("agentStatusChange", { agentId, status });
-        } catch (error) {
-          console.error("Error updating agent status:", error);
-          socket.emit("error", "Failed to update status");
-        }
-      });
-
-      // Handle disconnection
-      socket.on("disconnect", () => {
-        console.log(`Socket disconnected: ${socket.id}`);
-      });
+      if (isAgent) {
+        // Broadcast agent typing to the session (except the sender)
+        socket.to(sessionId).emit("agentTyping", { sessionId, isTyping });
+      } else {
+        // Broadcast customer typing to the session (except the sender)
+        socket.to(sessionId).emit("customerTyping", { sessionId, isTyping });
+      }
     });
-  }
 
-  return res.socket.server.io;
+    // Mark messages as read
+    socket.on("markRead", async (data) => {
+      try {
+        const { sessionId, messageIds } = data;
+
+        // Update the messages
+        await prisma.message.updateMany({
+          where: {
+            id: { in: messageIds },
+            chatSessionId: sessionId,
+          },
+          data: {
+            isRead: true,
+            readAt: new Date(),
+          },
+        });
+      } catch (error) {
+        console.error("Error marking messages as read:", error);
+        socket.emit("error", "Failed to mark messages as read");
+      }
+    });
+
+    // Update agent status
+    socket.on("updateStatus", async (data) => {
+      try {
+        const { status } = data;
+        const agentId = socket.data.user.agentId;
+
+        if (!agentId) {
+          socket.emit("error", "Not authorized as an agent");
+          return;
+        }
+
+        // Validate status
+        const validStatuses = ["active", "away", "offline"];
+        if (!validStatuses.includes(status)) {
+          socket.emit("error", "Invalid status");
+          return;
+        }
+
+        // Update the agent's status
+        await prisma.agent.update({
+          where: { id: agentId },
+          data: {
+            status,
+            lastActive: new Date(),
+          },
+        });
+
+        // Broadcast status change to all connected clients
+        io.emit("agentStatusChange", { agentId, status });
+      } catch (error) {
+        console.error("Error updating agent status:", error);
+        socket.emit("error", "Failed to update status");
+      }
+    });
+
+    // Handle disconnection
+    socket.on("disconnect", () => {
+      console.log(`Socket disconnected: ${socket.id}`);
+    });
+  });
+
+  return res;
 };
 
 export default initSocketServer;

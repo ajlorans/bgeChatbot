@@ -15,7 +15,7 @@ interface UseChatbotReturn {
   resetChat: () => void;
   category?: ChatCategory;
   isLiveChat: boolean;
-  requestLiveAgent: (email?: string) => Promise<void>;
+  requestLiveAgent: (email?: string, name?: string) => Promise<void>;
   liveChatStatus?: LiveChatStatus;
   liveChatDetails?: LiveChatDetails;
   endLiveChat: () => Promise<void>;
@@ -46,6 +46,242 @@ export function useChatbot({
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastMessageTimestampRef = useRef<number>(0);
 
+  // Function to poll for new messages in live chat
+  const startMessagePolling = useCallback(() => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+    }
+
+    // Immediate first poll when starting
+    const pollForMessages = async () => {
+      if (!liveChatDetails?.sessionId) {
+        console.warn("No sessionId available for message polling");
+        return;
+      }
+
+      try {
+        const sessionId = liveChatDetails.sessionId;
+        const timestamp = lastMessageTimestampRef.current;
+
+        // Add cache-busting parameter with random component
+        const cacheBust = `${Date.now()}-${Math.random()}`;
+
+        console.log(
+          `Polling for messages after timestamp ${new Date(
+            timestamp
+          ).toISOString()}`
+        );
+
+        const response = await fetch(
+          `/api/chat/live-chat?sessionId=${sessionId}&lastMessageTimestamp=${timestamp}&_=${cacheBust}`,
+          {
+            // Ensure no caching
+            cache: "no-store",
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "no-cache, no-store, must-revalidate",
+              Pragma: "no-cache",
+              Expires: "0",
+            },
+          }
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Live chat API error (${response.status}):`, errorText);
+          throw new Error(
+            `Failed to fetch live chat messages: ${response.status} ${response.statusText}`
+          );
+        }
+
+        const data = await response.json();
+
+        // Process response only if we have actual data
+        if (data.success) {
+          // Handle new messages if any
+          if (data.messages && data.messages.length > 0) {
+            console.log(
+              `Received ${data.messages.length} new messages from poll`
+            );
+
+            // Process messages to ensure they have the right format for the UI
+            const formattedMessages = data.messages.map(
+              (msg: {
+                id: string;
+                role: string;
+                content: string;
+                timestamp: string | number;
+                category?: string;
+              }) => ({
+                id: msg.id,
+                role: msg.role,
+                content: msg.content,
+                timestamp: (() => {
+                  try {
+                    if (typeof msg.timestamp === "string") {
+                      return msg.timestamp;
+                    } else {
+                      // Safely convert timestamp to ISO string
+                      const date = new Date(msg.timestamp);
+                      // Check if date is valid before converting
+                      return isNaN(date.getTime())
+                        ? new Date().toISOString() // Fallback to current time if invalid
+                        : date.toISOString();
+                    }
+                  } catch (e) {
+                    console.error("Error formatting timestamp:", e);
+                    return new Date().toISOString(); // Fallback to current time
+                  }
+                })(),
+                category: msg.category || "live_agent",
+              })
+            );
+
+            // Add new messages to the chat, avoiding duplicates
+            setMessages((prev) => {
+              // Filter out any messages we already have (avoid duplicates)
+              const existingIds = new Set(prev.map((m: Message) => m.id));
+              const existingContents = new Map(
+                prev.map((m: Message) => [
+                  `${m.role}:${m.content}:${m.timestamp}`,
+                  true,
+                ])
+              );
+
+              // Check for agent joined messages - special deduplication
+              const hasAgentJoinedMessage = prev.some(
+                (msg) =>
+                  msg.role === "system" &&
+                  msg.content.includes("has joined the conversation")
+              );
+
+              // Enhanced deduplication checking both ID and content+role+timestamp
+              const newMessages = formattedMessages.filter(
+                (m: {
+                  id: string;
+                  role: string;
+                  content: string;
+                  timestamp: string;
+                }) => {
+                  // Skip if we already have this ID
+                  if (existingIds.has(m.id)) return false;
+
+                  // Skip agent joined messages if we already have one
+                  if (
+                    hasAgentJoinedMessage &&
+                    m.role === "system" &&
+                    m.content.includes("has joined the conversation")
+                  )
+                    return false;
+
+                  // Also check for exact content+role+timestamp duplicates
+                  const contentKey = `${m.role}:${m.content}:${m.timestamp}`;
+                  if (existingContents.has(contentKey)) return false;
+
+                  return true;
+                }
+              );
+
+              if (newMessages.length === 0) return prev;
+              console.log(`Adding ${newMessages.length} new messages to chat`);
+              return [...prev, ...newMessages];
+            });
+          }
+
+          // Update last message timestamp if provided - CRITICAL FIX
+          if (data.lastMessageTimestamp) {
+            // Make sure to parse string timestamp to number
+            const newTimestamp = parseInt(data.lastMessageTimestamp, 10);
+            // Only update if it's a valid number and greater than current timestamp
+            if (
+              !isNaN(newTimestamp) &&
+              newTimestamp > lastMessageTimestampRef.current
+            ) {
+              console.log(
+                `Updating lastMessageTimestamp from ${lastMessageTimestampRef.current} to ${newTimestamp}`
+              );
+              lastMessageTimestampRef.current = newTimestamp;
+            }
+          }
+
+          // Update live chat status if changed
+          if (data.status && data.status !== liveChatStatus) {
+            console.log(
+              `Chat status changed from ${liveChatStatus} to ${data.status}`
+            );
+            const previousStatus = liveChatStatus;
+            setLiveChatStatus(data.status);
+
+            // If status changes from waiting/queued to active, notify the user
+            if (
+              (previousStatus === "waiting" || previousStatus === "queued") &&
+              data.status === "active" &&
+              data.agentName &&
+              !messages.some(
+                (msg) =>
+                  msg.role === "system" &&
+                  msg.content.includes("has joined the conversation")
+              )
+            ) {
+              // We'll rely on the server to provide the agent joined message
+              // The code here is just a fallback and ensures we don't add duplicates
+              console.log("Status changed to active, agent has joined");
+
+              // Update live chat details to include agent name
+              if (data.agentName) {
+                setLiveChatDetails((prev) => ({
+                  ...prev!,
+                  agentName: data.agentName,
+                }));
+              }
+            }
+
+            // If chat has ended
+            if (data.status === "ended" || data.status === "closed") {
+              setIsLiveChat(false);
+              if (pollingIntervalRef.current) {
+                clearInterval(pollingIntervalRef.current);
+                pollingIntervalRef.current = null;
+              }
+
+              // Add system message that chat has ended
+              setMessages((prev) => [
+                ...prev,
+                createMessage(
+                  "system",
+                  "This live chat session has ended. You can continue chatting with our AI assistant."
+                ),
+              ]);
+            }
+          } else if (data.agentName && !liveChatDetails?.agentName) {
+            // Still update agent name even if status didn't change
+            console.log(`Updating agent name to ${data.agentName}`);
+            setLiveChatDetails((prev) => ({
+              ...prev!,
+              agentName: data.agentName,
+            }));
+          }
+        }
+      } catch (error) {
+        console.error("Error polling for live chat messages:", error);
+        // Don't stop polling on errors, just log them
+      }
+    };
+
+    // Run polling immediately and then regularly
+    pollForMessages();
+
+    // Poll for new messages every 500ms - reduced frequency to prevent spam
+    pollingIntervalRef.current = setInterval(pollForMessages, 500);
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, [liveChatDetails, liveChatStatus]);
+
   // Initialize with welcome message
   useEffect(() => {
     if (messages.length === 0) {
@@ -64,15 +300,52 @@ export function useChatbot({
 
   // Set up polling for live chat messages
   useEffect(() => {
-    if (
-      isLiveChat &&
-      liveChatStatus === "active" &&
-      liveChatDetails?.sessionId
-    ) {
-      // Start polling for new messages
+    console.log("Live chat status changed:", {
+      isLiveChat,
+      liveChatStatus,
+      sessionId: liveChatDetails?.sessionId,
+    });
+
+    // Always start polling as soon as we're in live chat mode, regardless of status
+    if (isLiveChat && liveChatDetails?.sessionId) {
+      console.log("Starting message polling...");
+
+      // Immediately check for messages when starting polling
+      // This helps show agent messages right away
+      const checkForMessages = async () => {
+        try {
+          const sessionId = liveChatDetails.sessionId;
+          const timestamp = lastMessageTimestampRef.current;
+          const response = await fetch(
+            `/api/chat/live-chat?sessionId=${sessionId}&lastMessageTimestamp=${timestamp}&_=${Date.now()}-${Math.random()}`,
+            {
+              cache: "no-store",
+              headers: {
+                "Content-Type": "application/json",
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                Pragma: "no-cache",
+                Expires: "0",
+              },
+            }
+          );
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.messages && data.messages.length > 0) {
+              console.log(
+                `Initial poll found ${data.messages.length} messages`
+              );
+            }
+          }
+        } catch (error) {
+          console.error("Error in initial message check:", error);
+        }
+      };
+
+      checkForMessages();
       startMessagePolling();
     } else if (!isLiveChat && pollingIntervalRef.current) {
       // Stop polling if we're not in live chat
+      console.log("Stopping message polling...");
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
@@ -82,110 +355,38 @@ export function useChatbot({
         clearInterval(pollingIntervalRef.current);
       }
     };
-  }, [isLiveChat, liveChatStatus, liveChatDetails?.sessionId]);
-
-  // Function to poll for new messages in live chat
-  const startMessagePolling = useCallback(() => {
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-    }
-
-    // Check for new messages every 3 seconds
-    pollingIntervalRef.current = setInterval(async () => {
-      if (!liveChatDetails?.sessionId) {
-        console.warn("No sessionId available for message polling");
-        return;
-      }
-
-      try {
-        const sessionId = liveChatDetails.sessionId;
-        const timestamp = lastMessageTimestampRef.current;
-
-        const response = await fetch(
-          `/api/chat/live-chat?sessionId=${sessionId}&lastMessageTimestamp=${timestamp}`,
-          {
-            // Add error handling options
-            cache: "no-cache",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`Live chat API error (${response.status}):`, errorText);
-          throw new Error(
-            `Failed to fetch live chat messages: ${response.status} ${response.statusText}`
-          );
-        }
-
-        const data = await response.json();
-
-        if (data.success && data.messages && data.messages.length > 0) {
-          // Add new messages to the chat
-          setMessages((prev) => [...prev, ...data.messages]);
-
-          // Update last message timestamp
-          if (data.lastMessageTimestamp) {
-            lastMessageTimestampRef.current = data.lastMessageTimestamp;
-          }
-
-          // Update live chat status if changed
-          if (data.status !== liveChatStatus) {
-            setLiveChatStatus(data.status);
-
-            // If chat has ended
-            if (data.status === "ended") {
-              setIsLiveChat(false);
-              if (pollingIntervalRef.current) {
-                clearInterval(pollingIntervalRef.current);
-                pollingIntervalRef.current = null;
-              }
-
-              // Add system message that chat has ended
-              setMessages((prev) => [
-                ...prev,
-                createMessage(
-                  "system",
-                  "This live chat session has ended. You can continue chatting with our AI assistant."
-                ),
-              ]);
-            }
-          }
-
-          // Update agent name if available
-          if (
-            data.agentName &&
-            (!liveChatDetails.agentName ||
-              liveChatDetails.agentName !== data.agentName)
-          ) {
-            setLiveChatDetails((prev) => ({
-              ...prev!,
-              agentName: data.agentName,
-            }));
-          }
-        }
-      } catch (error) {
-        console.error("Error polling for live chat messages:", error);
-        // Don't stop polling on errors, just log them
-      }
-    }, 3000);
-
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
-    };
-  }, [liveChatDetails, liveChatStatus]);
+  }, [
+    isLiveChat,
+    liveChatStatus,
+    liveChatDetails?.sessionId,
+    startMessagePolling,
+  ]);
 
   const sendMessage = useCallback(
     async (content: string) => {
       if (!content.trim() || isLoading) return;
 
+      // Create a message with unique ID to prevent duplicates
       const userMessage = createMessage("user", content);
-      setMessages((prev) => [...prev, userMessage]);
+
+      // Add user message to chat
+      setMessages((prev) => {
+        // Check if we already have this exact message to prevent duplicates
+        const isDuplicate = prev.some(
+          (msg) =>
+            msg.role === "user" &&
+            msg.content === content &&
+            Date.now() - new Date(msg.timestamp).getTime() < 5000 // Added in the last 5 seconds
+        );
+
+        if (isDuplicate) {
+          console.log("Preventing duplicate user message:", content);
+          return prev;
+        }
+
+        return [...prev, userMessage];
+      });
+
       setIsLoading(true);
 
       try {
@@ -200,6 +401,7 @@ export function useChatbot({
               sessionId: liveChatDetails.sessionId,
               message: content,
               role: "user",
+              messageId: userMessage.id, // Send the message ID to prevent duplicates
               lastMessageTimestamp: lastMessageTimestampRef.current,
             }),
           });
@@ -212,17 +414,88 @@ export function useChatbot({
 
           // Update last message timestamp
           if (data.lastMessageTimestamp) {
-            lastMessageTimestampRef.current = data.lastMessageTimestamp;
+            try {
+              // Safely parse the timestamp
+              const newTimestamp = parseInt(
+                String(data.lastMessageTimestamp),
+                10
+              );
+              if (!isNaN(newTimestamp)) {
+                console.log(
+                  `Updating timestamp after sending message: ${newTimestamp}`
+                );
+                lastMessageTimestampRef.current = newTimestamp;
+              }
+            } catch (e) {
+              console.error(
+                "Error parsing timestamp from send message response:",
+                e
+              );
+            }
           }
 
           // If there are new messages from the agent, add them
           if (data.messages && data.messages.length > 0) {
-            const newMessages = data.messages.filter(
-              (msg: Message) => msg.role !== "user" // Filter out user's own messages
-            );
+            // Process messages to ensure they have valid timestamps
+            const formattedMessages = data.messages
+              .filter((msg: Message) => msg.role !== "user") // Filter out user's own messages
+              .map(
+                (msg: {
+                  id: string;
+                  role: string;
+                  content: string;
+                  timestamp?: string | number;
+                  category?: string;
+                }) => {
+                  // Ensure the timestamp is valid
+                  let safeTimestamp;
+                  try {
+                    if (typeof msg.timestamp === "string") {
+                      safeTimestamp = msg.timestamp;
+                    } else {
+                      const date = new Date(msg.timestamp || Date.now());
+                      safeTimestamp = !isNaN(date.getTime())
+                        ? date.toISOString()
+                        : new Date().toISOString();
+                    }
+                  } catch (e) {
+                    console.error("Error processing message timestamp:", e);
+                    safeTimestamp = new Date().toISOString();
+                  }
 
-            if (newMessages.length > 0) {
-              setMessages((prev) => [...prev, ...newMessages]);
+                  return {
+                    ...msg,
+                    timestamp: safeTimestamp,
+                  };
+                }
+              );
+
+            if (formattedMessages.length > 0) {
+              // Add new messages with duplicate checking
+              setMessages((prev) => {
+                // Get existing IDs and content signatures
+                const existingIds = new Set(prev.map((m: Message) => m.id));
+                const existingContents = new Set(
+                  prev.map((m: Message) => `${m.role}:${m.content}`)
+                );
+
+                // Filter out duplicates
+                const uniqueMessages = formattedMessages.filter(
+                  (msg: {
+                    id: string;
+                    role: string;
+                    content: string;
+                    timestamp: string;
+                    category?: string;
+                  }) =>
+                    !existingIds.has(msg.id) &&
+                    !existingContents.has(`${msg.role}:${msg.content}`)
+                );
+
+                return uniqueMessages.length > 0
+                  ? [...prev, ...uniqueMessages]
+                  : prev;
+              });
             }
           }
         } else {
@@ -305,7 +578,7 @@ export function useChatbot({
 
   // Request a live agent
   const requestLiveAgent = useCallback(
-    async (email?: string) => {
+    async (email?: string, name?: string) => {
       setIsLoading(true);
 
       try {
@@ -313,6 +586,7 @@ export function useChatbot({
         const sessionData = {
           sessionId: sessionIdRef.current,
           customerEmail: email,
+          customerName: name,
           issue: category,
           messages: currentMessages,
         };
@@ -356,10 +630,8 @@ export function useChatbot({
           // Initialize last message timestamp
           lastMessageTimestampRef.current = Date.now();
 
-          // If we're immediately connected to an agent, start polling
-          if (data.status === "active") {
-            startMessagePolling();
-          }
+          // Start polling immediately regardless of status
+          startMessagePolling();
         } else {
           throw new Error(data.message || "Failed to request live agent");
         }
@@ -392,6 +664,7 @@ export function useChatbot({
         },
         body: JSON.stringify({
           sessionId: liveChatDetails.sessionId,
+          endedBy: "customer",
         }),
       });
 

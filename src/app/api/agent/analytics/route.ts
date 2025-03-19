@@ -7,10 +7,8 @@ import { subDays, startOfDay, endOfDay } from "date-fns";
 interface ChatMessage {
   id: string;
   role: string;
-  createdAt: Date;
-  chatSession: {
-    id: string;
-  };
+  timestamp: Date;
+  sessionId: string;
 }
 
 interface ChatSession {
@@ -97,25 +95,29 @@ export async function GET() {
         ? Math.round((resolvedSessions / totalSessions) * 100)
         : 0;
 
-    // Get average response time
-    const messages = await prisma.chatMessage.findMany({
+    // Get active sessions for this agent
+    const activeSessions = await prisma.chatSession.findMany({
       where: {
-        chatSession: {
-          agentId,
+        agentId,
+        status: "active",
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    // Get average response time
+    const messages = await prisma.message.findMany({
+      where: {
+        sessionId: {
+          in: activeSessions.map((session) => session.id),
         },
-        createdAt: {
-          gte: lastMonthStart,
+        timestamp: {
+          gte: new Date(Date.now() - 24 * 60 * 60 * 1000), // Past 24 hours
         },
       },
       orderBy: {
-        createdAt: "asc",
-      },
-      include: {
-        chatSession: {
-          select: {
-            id: true,
-          },
-        },
+        timestamp: "asc",
       },
     });
 
@@ -123,13 +125,13 @@ export async function GET() {
     const messagesBySession: Record<
       string,
       {
-        customer: Array<{ id: string; createdAt: Date }>;
-        agent: Array<{ id: string; createdAt: Date }>;
+        customer: Array<{ id: string; timestamp: Date }>;
+        agent: Array<{ id: string; timestamp: Date }>;
       }
     > = {};
 
-    messages.forEach((msg: ChatMessage) => {
-      const sessionId = msg.chatSession.id;
+    messages.forEach((msg) => {
+      const sessionId = msg.sessionId;
 
       if (!messagesBySession[sessionId]) {
         messagesBySession[sessionId] = {
@@ -141,12 +143,12 @@ export async function GET() {
       if (msg.role === "user") {
         messagesBySession[sessionId].customer.push({
           id: msg.id,
-          createdAt: msg.createdAt,
+          timestamp: msg.timestamp,
         });
-      } else if (msg.role === "assistant") {
+      } else if (msg.role === "agent") {
         messagesBySession[sessionId].agent.push({
           id: msg.id,
-          createdAt: msg.createdAt,
+          timestamp: msg.timestamp,
         });
       }
     });
@@ -159,12 +161,12 @@ export async function GET() {
       session.customer.forEach((customerMsg) => {
         // Find the next agent message after this customer message
         const nextAgentMsg = session.agent.find(
-          (agentMsg) => agentMsg.createdAt > customerMsg.createdAt
+          (agentMsg) => agentMsg.timestamp > customerMsg.timestamp
         );
 
         if (nextAgentMsg) {
           const responseTime =
-            nextAgentMsg.createdAt.getTime() - customerMsg.createdAt.getTime();
+            nextAgentMsg.timestamp.getTime() - customerMsg.timestamp.getTime();
           totalResponseTime += responseTime;
           responseCount++;
         }

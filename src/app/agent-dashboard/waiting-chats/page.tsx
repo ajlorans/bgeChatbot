@@ -28,7 +28,18 @@ export default function WaitingChatsPage() {
     const fetchSessions = async () => {
       try {
         setLoading(true);
-        const response = await fetch("/api/agent/sessions?status=waiting");
+        // Add cache buster to prevent browser caching
+        const cacheBuster = `${Date.now()}-${Math.random()}`;
+        const response = await fetch(
+          `/api/agent/sessions?status=waiting&_=${cacheBuster}`,
+          {
+            headers: {
+              "Cache-Control": "no-cache, no-store, must-revalidate",
+              Pragma: "no-cache",
+              Expires: "0",
+            },
+          }
+        );
 
         if (!response.ok) {
           throw new Error("Failed to fetch waiting sessions");
@@ -46,6 +57,11 @@ export default function WaitingChatsPage() {
 
     // Initial fetch
     fetchSessions();
+
+    // Set default to 5 seconds for quicker updates
+    if (refreshInterval > 10) {
+      setRefreshInterval(5);
+    }
 
     // Set up polling
     const intervalId = setInterval(fetchSessions, refreshInterval * 1000);
@@ -183,7 +199,7 @@ export default function WaitingChatsPage() {
       ) : sessions.length === 0 ? (
         <div className="bg-white p-8 rounded-lg shadow text-center">
           <svg
-            className="mx-auto h-12 w-12 text-gray-400"
+            className="mx-auto h-12 w-12 text-gray-500"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"

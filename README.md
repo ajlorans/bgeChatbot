@@ -21,7 +21,28 @@ A Next.js-based AI chatbot for Big Green Egg, featuring order tracking, product 
 - 📱 Responsive design
 - 🧪 Comprehensive unit tests
 
-## Recent Updates
+## Recent Updates (live-agent-session-ending branch)
+
+### Improved Real-time Communication
+
+- **Reliable Message Delivery**: Enhanced Socket.io implementation to guarantee message delivery between customers and agents
+- **Multi-channel Socket Communication**: Messages now broadcast through multiple channels to ensure delivery
+- **Chat Ending Notifications**: Clear notifications when customers end chat sessions
+- **Visual Status Indicators**: Added visual cues to indicate when a chat has been ended by a customer
+- **Role-based Socket Rooms**: Implemented dedicated rooms for agents and customers for better message routing
+- **Fallback Polling Mechanism**: Added a polling mechanism as a backup for critical real-time updates
+- **Enhanced Debugging**: Improved logging and error handling for Socket.io events
+
+### Bug Fixes
+
+- Fixed issues with customer messages not appearing in agent chat sessions
+- Fixed notifications when customers end chat sessions
+- Resolved duplicate message display problems
+- Enhanced error handling for timestamp conversion
+- Improved session status synchronization
+- Fixed socket room management
+
+### Previous Updates
 
 - **Live Agent Integration**: Added the ability for customers to request a live chat with a support agent
 - **Agent Dashboard**: Created a comprehensive dashboard for agents to manage customer chat sessions
@@ -110,6 +131,7 @@ The agent dashboard provides a comprehensive interface for managing live custome
 - **Real-time Messaging**: Instant communication with customers
 
 Default agent credentials:
+
 - Email: agent@example.com
 - Password: agent123
 
@@ -146,6 +168,33 @@ The test suite includes:
 - `/prisma` - Database schema and migrations
 - `/public` - Static assets
 - `/src/__tests__` - Test files organized by category
+
+## Socket.io Communication Architecture
+
+The live-agent-session-ending branch implements an enhanced Socket.io architecture:
+
+1. **Multi-channel Delivery**: Messages are sent through multiple channels to ensure delivery:
+
+   - Direct to specific session rooms
+   - To role-based rooms (agents/customers)
+   - Global broadcasts as fallback
+
+2. **Room Management**:
+
+   - Users are automatically added to role-based rooms upon connection
+   - Session IDs are explicitly converted to strings for consistent room naming
+   - Sessions have dedicated rooms for targeted communication
+
+3. **Message Deduplication**:
+
+   - Messages are checked for duplicates by ID
+   - Content-based duplicate detection prevents similar messages
+   - Timestamp proximity checks prevent duplicates with different IDs
+
+4. **Fallback Mechanisms**:
+   - Periodic polling refreshes data if socket events are missed
+   - Session status is periodically checked to detect changes
+   - System messages are generated for important events like chat ending
 
 ## Contributing
 

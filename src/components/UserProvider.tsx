@@ -9,6 +9,7 @@ interface User {
   image?: string;
   role: string;
   agentId?: string;
+  status?: string;
 }
 
 interface UserContextType {

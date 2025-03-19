@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSocket } from "@/contexts/SocketContext";
 import { format } from "date-fns";
 
+// Use a local message interface similar to what we had before
 interface Message {
   id: string;
   content: string;
@@ -20,21 +21,14 @@ interface Message {
 
 interface ChatSession {
   id: string;
+  status: string;
   customerName: string | null;
   customerEmail: string | null;
-  status: string;
+  customerMetadata?: any;
   createdAt: string;
   updatedAt: string;
   agentId: string | null;
-  agentName: string | null;
-  customerMetadata?: {
-    browser?: string;
-    os?: string;
-    device?: string;
-    ip?: string;
-    location?: string;
-    referrer?: string;
-  };
+  agentName?: string;
 }
 
 export default function ChatSessionPage() {
@@ -101,101 +95,254 @@ export default function ChatSessionPage() {
   useEffect(() => {
     if (!socket || !isConnected || !id) return;
 
-    // Handle new messages
-    const handleNewMessage = (message: {
-      id: string;
-      content: string;
-      role?: "agent" | "user" | "system";
-      sessionId?: string;
-      timestamp?: string | number;
-      metadata?: {
-        chatSessionId?: string;
-        [key: string]: unknown;
-      };
-    }) => {
-      console.log("Message received in chat component:", message);
+    // Debug that socket is connected
+    console.log(`Socket connected: ${socket.id}, for session: ${id}`);
 
-      // Check if this message belongs to the current session
-      if (message.sessionId === id || message.metadata?.chatSessionId === id) {
-        // Format the message to match the component's expected format
-        const formattedMessage: Message = {
-          id: message.id,
-          content: message.content,
-          sender: message.role === "agent" ? "Agent" : "Customer",
-          timestamp:
-            typeof message.timestamp === "number"
-              ? new Date(message.timestamp).toISOString()
-              : message.timestamp || new Date().toISOString(),
-          isAgent: message.role === "agent",
-          isSystem: message.role === "system",
-          metadata: message.metadata || {},
-        };
+    // Register for session events
+    socket.emit("joinSession", id);
+    console.log(`Agent requested to join room: ${id}`);
 
-        // Add the message to the list, avoiding duplicates
-        setMessages((prev) => {
-          // Check if message already exists in the list
-          const exists = prev.some((m) => m.id === formattedMessage.id);
-          if (exists) return prev;
-          return [...prev, formattedMessage];
+    // Set up periodic refresh polling to get fresh data in case we miss socket events
+    const refreshInterval = setInterval(() => {
+      console.log("Refreshing chat session data...");
+
+      // Fetch messages
+      fetch(`/api/agent/sessions/${id}/messages`, {
+        credentials: "include",
+        headers: {
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.messages && data.messages.length > 0) {
+            // Process messages to avoid duplicates
+            setMessages((prevMessages) => {
+              // Create a set of existing message IDs for quick lookup
+              const existingIds = new Set(prevMessages.map((m) => m.id));
+
+              // Filter to only include new messages
+              const newMessages = data.messages.filter(
+                (msg: any) => !existingIds.has(msg.id)
+              );
+
+              if (newMessages.length > 0) {
+                console.log(
+                  `Adding ${newMessages.length} new messages from polling`
+                );
+                return [...prevMessages, ...newMessages];
+              }
+
+              return prevMessages;
+            });
+          }
+        })
+        .catch((error) => {
+          console.error("Error refreshing messages:", error);
         });
+
+      // Also refresh session status to detect closed sessions
+      fetch(`/api/agent/sessions/${id}`, { credentials: "include" })
+        .then((res) => res.json())
+        .then((data) => {
+          // Check if session status has changed
+          if (data.session && data.session.status !== session?.status) {
+            console.log(
+              `Session status changed from ${session?.status} to ${data.session.status}`
+            );
+            setSession(data.session);
+
+            // If status is now closed and wasn't before, add a system message
+            if (
+              data.session.status === "closed" &&
+              session?.status !== "closed"
+            ) {
+              // Add a system message locally if not already present
+              setMessages((prevMessages) => {
+                // Check if we already have a similar message
+                const hasEndMessage = prevMessages.some(
+                  (msg) =>
+                    msg.isSystem &&
+                    (msg.content.includes("customer has ended") ||
+                      msg.content.includes("ended by customer"))
+                );
+
+                if (hasEndMessage) return prevMessages;
+
+                // Add new system message
+                return [
+                  ...prevMessages,
+                  {
+                    id: `system-${Date.now()}`,
+                    content: "The customer has ended this chat session.",
+                    sender: "System",
+                    timestamp: new Date().toISOString(),
+                    isAgent: false,
+                    isSystem: true,
+                    metadata: { chatSessionId: id, endedBy: "customer" },
+                  },
+                ];
+              });
+            }
+          }
+        })
+        .catch((error) => {
+          console.error("Error refreshing session:", error);
+        });
+    }, 5000); // Poll every 5 seconds
+
+    // Handle incoming messages from the socket
+    const handleNewMessage = (message: any) => {
+      console.log("⚡ Socket received message:", message);
+
+      // Check if message is valid
+      if (!message || !message.content) {
+        console.log("Ignoring invalid message:", message);
+        return;
       }
+
+      // Determine if this message belongs to this session via multiple possible fields
+      const messageSessionId =
+        message.sessionId ||
+        message.chatSessionId ||
+        (message.metadata && message.metadata.chatSessionId);
+
+      console.log(
+        `Message session ID: ${messageSessionId}, Current session: ${id}`
+      );
+
+      // Only handle messages for this session
+      if (messageSessionId !== id) {
+        console.log("Ignoring message for different session");
+        return;
+      }
+
+      // Log the message to help with debugging
+      console.log(`✅ Processing message for session ${id}:`, message);
+
+      // Ensure the message has a unique ID
+      const messageId =
+        message.id ||
+        `socket-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+      // Determine sender based on multiple possible properties
+      let sender = "Customer";
+      let isSystemMessage = false;
+
+      if (message.isAgent || message.role === "agent") {
+        sender = "Agent";
+      } else if (message.isSystem || message.role === "system") {
+        sender = "System";
+        isSystemMessage = true;
+      } else if (message.sender === "Agent") {
+        sender = "Agent";
+      } else if (message.sender) {
+        sender = message.sender;
+      }
+
+      // Parse timestamp with fallback
+      let timestamp = new Date().toISOString();
+      try {
+        if (message.timestamp) {
+          if (
+            typeof message.timestamp === "object" &&
+            message.timestamp instanceof Date
+          ) {
+            timestamp = message.timestamp.toISOString();
+          } else if (typeof message.timestamp === "string") {
+            timestamp = message.timestamp;
+          } else if (typeof message.timestamp === "number") {
+            timestamp = new Date(message.timestamp).toISOString();
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing message timestamp:", e);
+      }
+
+      const formattedMessage: Message = {
+        id: messageId,
+        content: message.content,
+        sender: sender,
+        timestamp: timestamp,
+        isAgent: sender === "Agent",
+        isSystem: isSystemMessage,
+        metadata: message.metadata || {},
+      };
+
+      console.log("📝 Adding formatted message:", formattedMessage);
+
+      // Add the message to the list, avoiding duplicates
+      setMessages((prev) => {
+        // Check if message already exists by ID
+        const duplicateIdIndex = prev.findIndex((m) => m.id === messageId);
+        if (duplicateIdIndex !== -1) {
+          console.log("🔄 Skipping duplicate message (same ID)");
+          return prev;
+        }
+
+        // Also check for duplicate content that might have different IDs
+        const duplicateContentIndex = prev.findIndex(
+          (m) =>
+            m.content === formattedMessage.content &&
+            m.sender === formattedMessage.sender &&
+            Math.abs(
+              new Date(m.timestamp).getTime() -
+                new Date(formattedMessage.timestamp).getTime()
+            ) < 5000
+        );
+
+        if (duplicateContentIndex !== -1) {
+          console.log("🔄 Skipping duplicate message (similar content)");
+          return prev;
+        }
+
+        console.log("✅ Adding new message to chat");
+        return [...prev, formattedMessage];
+      });
     };
 
+    // Handle customer typing indicators
     const handleTypingIndicator = (data: {
       sessionId: string;
       isTyping: boolean;
     }) => {
       if (data.sessionId === id) {
+        console.log(`Customer typing: ${data.isTyping}`);
         setCustomerTyping(data.isTyping);
 
-        if (data.isTyping) {
-          // Reset the typing timeout if it exists
-          if (typingTimeout) {
-            clearTimeout(typingTimeout);
-          }
+        // Clear previous timeout if it exists
+        if (typingTimeout) {
+          clearTimeout(typingTimeout);
+        }
 
-          // Set a new timeout to clear the typing indicator
+        // Auto-clear typing indicator after 5 seconds
+        if (data.isTyping) {
           const timeout = setTimeout(() => {
             setCustomerTyping(false);
-          }, 3000);
-
+          }, 5000);
           setTypingTimeout(timeout);
         }
       }
     };
 
-    const handleSessionEnded = (data: { sessionId: string }) => {
-      if (data.sessionId === id) {
-        // Refresh session data to update status
-        fetch(`/api/agent/sessions/${id}`, { credentials: "include" })
-          .then((res) => res.json())
-          .then((data) => {
-            setSession(data.session);
-          })
-          .catch((error) => {
-            console.error("Error refreshing session:", error);
-          });
-      }
-    };
-
-    // Subscribe to events
+    // Subscribe to socket events
     socket.on("messageReceived", handleNewMessage);
     socket.on("customerTyping", handleTypingIndicator);
-    socket.on("sessionUpdated", handleSessionEnded);
 
-    // Join the chat room
-    socket.emit("joinSession", id);
-    console.log("Joined chat room:", id);
+    console.log("Socket event handlers registered");
 
     // Clean up on unmount
     return () => {
       socket.off("messageReceived", handleNewMessage);
       socket.off("customerTyping", handleTypingIndicator);
-      socket.off("sessionUpdated", handleSessionEnded);
 
       // Leave the chat room
       socket.emit("leaveSession", id);
-      console.log("Left chat room:", id);
+      console.log(`Left chat room: ${id}`);
+
+      // Clear the refresh interval
+      clearInterval(refreshInterval);
     };
   }, [socket, isConnected, id, typingTimeout]);
 
@@ -206,9 +353,14 @@ export default function ChatSessionPage() {
     try {
       setSending(true);
 
+      // Generate a truly unique ID for temp messages
+      const tempId = `temp-${Date.now()}-${Math.random()
+        .toString(36)
+        .substring(2, 9)}`;
+
       // Create a temporary message for immediate display
       const tempMessage: Message = {
-        id: `temp-${Date.now()}`,
+        id: tempId,
         content: inputValue,
         sender: "Agent",
         timestamp: new Date().toISOString(),
@@ -218,7 +370,21 @@ export default function ChatSessionPage() {
       };
 
       // Add the message to local state immediately for better UX
-      setMessages((prev) => [...prev, tempMessage]);
+      setMessages((prev) => {
+        // Make sure we don't already have this exact message in the list
+        const isDuplicate = prev.some(
+          (msg) =>
+            msg.content === tempMessage.content &&
+            msg.isAgent === tempMessage.isAgent &&
+            Math.abs(
+              new Date(msg.timestamp).getTime() -
+                new Date(tempMessage.timestamp).getTime()
+            ) < 5000
+        );
+
+        if (isDuplicate) return prev;
+        return [...prev, tempMessage];
+      });
 
       // Send to the server
       const response = await fetch(`/api/agent/sessions/${id}/messages`, {
@@ -239,19 +405,33 @@ export default function ChatSessionPage() {
       // Get the real message from the response
       const data = await response.json();
 
-      // Replace the temporary message with the real one if available
+      // Remove the temporary message and add the real one
       if (data.message) {
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === tempMessage.id
-              ? {
-                  ...msg,
-                  id: data.message.id,
-                  timestamp: data.message.timestamp || msg.timestamp,
-                }
-              : msg
-          )
-        );
+        setMessages((prev) => {
+          // Filter out the temporary message
+          const filtered = prev.filter((msg) => msg.id !== tempId);
+
+          // Check if the real message already exists in the list
+          const realMessageExists = filtered.some(
+            (msg) => msg.id === data.message.id
+          );
+
+          if (realMessageExists) return filtered;
+
+          // Add the real message with proper formatting
+          return [
+            ...filtered,
+            {
+              id: data.message.id,
+              content: data.message.content,
+              sender: "Agent",
+              timestamp: data.message.timestamp || new Date().toISOString(),
+              isAgent: true,
+              isSystem: false,
+              metadata: data.message.metadata || { chatSessionId: id },
+            },
+          ];
+        });
       }
 
       setInputValue("");
@@ -305,10 +485,23 @@ export default function ChatSessionPage() {
     }
   };
 
-  // Format a timestamp
+  // Format message timestamp
   const formatTimestamp = (timestamp: string) => {
-    return format(new Date(timestamp), "p");
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
+
+  // Check if the session has been ended by customer
+  const isSessionEndedByCustomer = messages.some(
+    (msg) =>
+      msg.isSystem &&
+      (msg.content.includes("customer has ended") ||
+        msg.content.includes("Live chat ended by customer") ||
+        (msg.metadata && msg.metadata.endedBy === "customer"))
+  );
 
   if (loading) {
     return (
@@ -360,27 +553,34 @@ export default function ChatSessionPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)]">
+    <div className="h-[calc(100vh-64px)] flex flex-col bg-gray-50">
       {/* Chat header */}
-      <div className="bg-white border-b p-4 flex justify-between items-center">
+      <div className="p-4 bg-white border-b shadow-sm flex justify-between items-center">
         <div>
-          <h1 className="text-lg font-medium">
-            Chat with {session.customerName || "Anonymous Customer"}
+          <h1 className="text-xl font-semibold text-gray-800">
+            Chat with {session?.customerName || "Customer"}
           </h1>
-          <p className="text-sm text-gray-500">
-            {session.customerEmail || "No email provided"} •
-            {session.status === "active" ? (
-              <span className="text-green-600 ml-1">Active</span>
-            ) : (
-              <span className="text-gray-600 ml-1">Closed</span>
-            )}
-          </p>
+          {session?.customerEmail && (
+            <p className="text-sm text-gray-600">{session.customerEmail}</p>
+          )}
         </div>
-        <div className="flex space-x-2">
-          {session.status === "active" && (
+        <div className="flex items-center space-x-3">
+          {isSessionEndedByCustomer && (
+            <span className="px-2 py-1 bg-red-100 text-red-800 text-sm rounded-md">
+              Chat ended by customer
+            </span>
+          )}
+          {!isSessionEndedByCustomer && session?.status === "active" && (
             <button
               onClick={endSession}
-              className="bg-red-50 text-red-600 hover:bg-red-100 px-4 py-2 rounded"
+              disabled={
+                session?.status === "ended" || session?.status === "closed"
+              }
+              className={`px-3 py-1.5 rounded text-white ${
+                session?.status === "ended" || session?.status === "closed"
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-red-500 hover:bg-red-600"
+              }`}
             >
               End Chat
             </button>
@@ -388,14 +588,24 @@ export default function ChatSessionPage() {
         </div>
       </div>
 
+      {/* Show message when chat has been ended by customer */}
+      {isSessionEndedByCustomer && (
+        <div className="bg-red-50 p-3 border-b border-red-200">
+          <p className="text-center text-red-700 text-sm">
+            This chat has been ended by the customer. You can no longer send
+            messages.
+          </p>
+        </div>
+      )}
+
       {/* Customer information sidebar */}
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 overflow-auto p-4">
           {/* Messages */}
           <div className="flex flex-col space-y-4">
-            {messages.map((message) => (
+            {messages.map((message, index) => (
               <div
-                key={message.id}
+                key={`${message.id}-${index}`}
                 className={`flex ${
                   message.isAgent ? "justify-start" : "justify-end"
                 }`}
@@ -545,47 +755,58 @@ export default function ChatSessionPage() {
         </div>
       </div>
 
-      {/* Message input */}
-      {session.status === "active" ? (
-        <div className="p-4 border-t bg-white">
-          <div className="flex">
-            <textarea
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={sending}
-              className="flex-1 border rounded-l-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Type your message..."
-              rows={2}
-            />
-            <button
-              onClick={sendMessage}
-              disabled={!inputValue.trim() || sending}
-              className={`px-4 py-2 rounded-r-lg ${
-                !inputValue.trim() || sending
-                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  : "bg-blue-500 text-white hover:bg-blue-600"
-              }`}
-            >
-              {sending ? (
-                <>
-                  <span className="inline-block w-4 h-4 mr-1 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                  Sending...
-                </>
-              ) : (
-                "Send"
-              )}
-            </button>
-          </div>
-          <p className="text-xs text-gray-500 mt-1">
-            Press Enter to send, Shift+Enter for a new line
-          </p>
-        </div>
-      ) : (
-        <div className="p-4 bg-gray-100 text-center border-t">
-          <p className="text-gray-600">This chat session has ended</p>
-        </div>
-      )}
+      {/* Chat input */}
+      <div className="p-3 bg-white border-t">
+        <form onSubmit={(e) => e.preventDefault()} className="flex">
+          <textarea
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={
+              sending ||
+              session?.status === "ended" ||
+              session?.status === "closed" ||
+              isSessionEndedByCustomer
+            }
+            placeholder={
+              isSessionEndedByCustomer
+                ? "Chat has been ended by the customer"
+                : session?.status === "ended" || session?.status === "closed"
+                ? "This chat has ended"
+                : "Type your message..."
+            }
+            className={`flex-1 p-2 border rounded-l-md focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+              isSessionEndedByCustomer ||
+              session?.status === "ended" ||
+              session?.status === "closed"
+                ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+                : "bg-white"
+            }`}
+            rows={2}
+          ></textarea>
+          <button
+            onClick={sendMessage}
+            disabled={
+              !inputValue.trim() ||
+              sending ||
+              session?.status === "ended" ||
+              session?.status === "closed" ||
+              isSessionEndedByCustomer
+            }
+            className={`px-4 rounded-r-md ${
+              !inputValue.trim() ||
+              sending ||
+              isSessionEndedByCustomer ||
+              session?.status === "ended" ||
+              session?.status === "closed"
+                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                : "bg-blue-500 text-white hover:bg-blue-600"
+            }`}
+          >
+            {sending ? "Sending..." : "Send"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

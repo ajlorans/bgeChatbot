@@ -17,7 +17,6 @@ export default function AgentDashboardLayout({
   const { user, loading, logout } = useUser();
   const { socket, isConnected } = useSocket();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
 
   // Check authentication status
   useEffect(() => {
@@ -66,7 +65,7 @@ export default function AgentDashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* Top Navigation */}
       <header className="bg-white shadow-sm">
         <div className="mx-auto px-4 sm:px-6 lg:px-8">
@@ -122,11 +121,11 @@ export default function AgentDashboardLayout({
                   >
                     <span
                       className={`h-3 w-3 rounded-full ${getStatusColor(
-                        user.status || "offline"
+                        user.status || "active"
                       )} mr-2`}
                     ></span>
                     <span className="capitalize">
-                      {user.status || "offline"}
+                      {user.status || "active"}
                     </span>
                   </button>
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 hidden">
@@ -246,11 +245,6 @@ export default function AgentDashboardLayout({
                   />
                 </svg>
                 Active Chats
-                {unreadCount > 0 && (
-                  <span className="ml-auto bg-red-500 text-white text-xs font-semibold w-5 h-5 flex items-center justify-center rounded-full">
-                    {unreadCount}
-                  </span>
-                )}
               </Link>
 
               {/* Waiting Chats */}
@@ -351,35 +345,28 @@ export default function AgentDashboardLayout({
                 </Link>
               )}
             </nav>
-
-            {/* Connection status indicator */}
-            <div className="mt-auto px-4 py-2 border-t border-gray-200">
-              <div className="flex items-center">
-                <div
-                  className={`h-2 w-2 rounded-full ${
-                    isConnected ? "bg-green-500" : "bg-red-500"
-                  }`}
-                ></div>
-                <span className="ml-2 text-xs text-gray-500">
-                  {isConnected ? "Connected" : "Disconnected"}
-                </span>
-              </div>
-            </div>
           </div>
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 md:ml-64 p-6">
-          {/* Overlay for mobile sidebar */}
-          {sidebarOpen && (
-            <div
-              className="fixed inset-0 z-0 bg-gray-600 opacity-75 md:hidden"
-              onClick={() => setSidebarOpen(false)}
-            ></div>
-          )}
-          {children}
+        <main className="flex-grow overflow-auto md:ml-64 h-[calc(100vh-7rem)]">
+          <div className="container mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            {children}
+          </div>
         </main>
       </div>
+
+      {/* Footer with connection status */}
+      <footer className="bg-white border-t border-gray-200 py-2 px-4">
+        <div className="flex items-center text-sm text-gray-500">
+          <span
+            className={`h-2 w-2 rounded-full mr-2 ${
+              isConnected ? "bg-green-500" : "bg-red-500"
+            }`}
+          ></span>
+          {isConnected ? "Connected" : "Disconnected"}
+        </div>
+      </footer>
     </div>
   );
 }

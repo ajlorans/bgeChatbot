@@ -54,13 +54,16 @@ export interface ChatResponse {
 export type LiveChatStatus =
   | "requested" // User has requested a live agent
   | "queued" // User is waiting for an agent
+  | "waiting" // User is waiting for an agent (dashboard terminology)
   | "active" // User is connected with an agent
   | "ended" // Chat session has ended
+  | "closed" // Chat session is completed and in history
   | "abandoned"; // User left before agent connected
 
 export interface LiveChatRequest {
   sessionId: string;
   customerEmail?: string;
+  customerName?: string;
   issue?: string;
   priority?: "low" | "medium" | "high";
 }

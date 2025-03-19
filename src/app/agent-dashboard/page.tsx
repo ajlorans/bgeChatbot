@@ -91,12 +91,37 @@ export default function AgentDashboardPage() {
       }
     };
 
+    // Initial fetch
     fetchStats();
 
-    // Set up refresh interval (every 30 seconds)
-    const intervalId = setInterval(fetchStats, 30000);
+    // Set up refresh interval (every 10 seconds to check for new waiting chats)
+    const intervalId = setInterval(fetchStats, 10000);
 
-    return () => clearInterval(intervalId);
+    // Also set up a faster refresh just for waiting chats
+    const waitingChatsIntervalId = setInterval(async () => {
+      try {
+        const response = await fetch("/api/agent/me", {
+          credentials: "include",
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.authenticated) {
+            setStats((prevStats) => ({
+              ...prevStats,
+              waitingSessions: data.stats.waitingSessions,
+            }));
+          }
+        }
+      } catch (error) {
+        console.error("Error refreshing waiting chats count:", error);
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(intervalId);
+      clearInterval(waitingChatsIntervalId);
+    };
   }, []);
 
   // Note: We've removed the socket event listeners due to type compatibility issues.
@@ -532,7 +557,7 @@ export default function AgentDashboardPage() {
         ) : (
           <div className="bg-white rounded-lg shadow p-6 text-center">
             <svg
-              className="mx-auto h-12 w-12 text-gray-400"
+              className="mx-auto h-12 w-12 text-gray-500"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"

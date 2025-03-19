@@ -4,8 +4,8 @@ import { getServerSession } from "@/lib/session";
 
 interface ChatMessage {
   id: string;
-  chatSessionId: string;
-  createdAt: Date;
+  sessionId: string;
+  timestamp: Date;
 }
 
 interface ChatSession {
@@ -72,38 +72,38 @@ export async function GET() {
 
     if (sessionIds.length > 0) {
       // Get customer messages
-      const customerMessages = await prisma.chatMessage.findMany({
+      const customerMessages = await prisma.message.findMany({
         where: {
-          chatSessionId: {
+          sessionId: {
             in: sessionIds,
           },
-          sender: "customer",
+          role: "user",
         },
         orderBy: {
-          createdAt: "asc",
+          timestamp: "asc",
         },
         select: {
           id: true,
-          chatSessionId: true,
-          createdAt: true,
+          sessionId: true,
+          timestamp: true,
         },
       });
 
       // Get agent messages
-      const agentMessages = await prisma.chatMessage.findMany({
+      const agentMessages = await prisma.message.findMany({
         where: {
-          chatSessionId: {
+          sessionId: {
             in: sessionIds,
           },
-          sender: "agent",
+          role: "agent",
         },
         orderBy: {
-          createdAt: "asc",
+          timestamp: "asc",
         },
         select: {
           id: true,
-          chatSessionId: true,
-          createdAt: true,
+          sessionId: true,
+          timestamp: true,
         },
       });
 
@@ -114,18 +114,18 @@ export async function GET() {
       // Group messages by chat session
       const messagesBySession: Record<string, SessionMessages> = {};
 
-      customerMessages.forEach((msg: ChatMessage) => {
-        if (!messagesBySession[msg.chatSessionId]) {
-          messagesBySession[msg.chatSessionId] = { customer: [], agent: [] };
+      customerMessages.forEach((msg) => {
+        if (!messagesBySession[msg.sessionId]) {
+          messagesBySession[msg.sessionId] = { customer: [], agent: [] };
         }
-        messagesBySession[msg.chatSessionId].customer.push(msg);
+        messagesBySession[msg.sessionId].customer.push(msg);
       });
 
-      agentMessages.forEach((msg: ChatMessage) => {
-        if (!messagesBySession[msg.chatSessionId]) {
-          messagesBySession[msg.chatSessionId] = { customer: [], agent: [] };
+      agentMessages.forEach((msg) => {
+        if (!messagesBySession[msg.sessionId]) {
+          messagesBySession[msg.sessionId] = { customer: [], agent: [] };
         }
-        messagesBySession[msg.chatSessionId].agent.push(msg);
+        messagesBySession[msg.sessionId].agent.push(msg);
       });
 
       // Calculate response times for each session
@@ -133,13 +133,13 @@ export async function GET() {
         sessionMessages.customer.forEach((customerMsg) => {
           // Find the next agent message after this customer message
           const nextAgentMsg = sessionMessages.agent.find(
-            (agentMsg) => agentMsg.createdAt > customerMsg.createdAt
+            (agentMsg) => agentMsg.timestamp > customerMsg.timestamp
           );
 
           if (nextAgentMsg) {
             const responseTime =
-              (new Date(nextAgentMsg.createdAt).getTime() -
-                new Date(customerMsg.createdAt).getTime()) /
+              (new Date(nextAgentMsg.timestamp).getTime() -
+                new Date(customerMsg.timestamp).getTime()) /
               (1000 * 60); // in minutes
             totalResponseTime += responseTime;
             responseCount++;

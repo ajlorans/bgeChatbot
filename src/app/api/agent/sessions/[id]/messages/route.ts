@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "@/lib/session";
+import { io } from "@/lib/socketService";
 
 /**
  * Verify if an agent has access to a session
@@ -155,20 +156,82 @@ export async function POST(
       },
     });
 
-    // Update the session's last activity timestamp
+    // Ensure the session is in active status and assigned to this agent
     await prisma.chatSession.update({
       where: { id: sessionId },
       data: {
+        status: "active",
+        agentId: userSession.user.agentId,
         updatedAt: new Date(),
-        // If the session is waiting, assign it to this agent and mark as active
-        ...(hasAccess && {
-          agentId: userSession.user.agentId,
-          status: "active",
-        }),
       },
     });
 
-    return NextResponse.json({ success: true, message });
+    // Enhanced socket emission for real-time updates
+    try {
+      if (io) {
+        console.log(
+          `Broadcasting agent message to session ${sessionId} via socket.io`
+        );
+
+        // Format the message for socket clients
+        const formattedMessage = {
+          id: message.id,
+          content: message.content,
+          role: "agent",
+          sender: "Agent",
+          timestamp: message.timestamp.toISOString(),
+          isAgent: true,
+          isSystem: false,
+          sessionId: String(sessionId),
+          chatSessionId: String(sessionId),
+          metadata: {
+            chatSessionId: String(sessionId),
+            messageId: message.id,
+            agentId: userSession.user.agentId,
+          },
+        };
+
+        // Log active rooms
+        console.log(`Active socket rooms:`, io.sockets.adapter.rooms);
+
+        // Use multiple strategies to ensure message delivery
+
+        // 1. Send to specific session room
+        io.to(String(sessionId)).emit("messageReceived", formattedMessage);
+        console.log(`Emitted to session room: ${sessionId}`);
+
+        // 2. Send to the customers room (all customers)
+        io.to("customers").emit("messageReceived", formattedMessage);
+        console.log(`Emitted to customers room`);
+
+        // 3. Broadcast globally to all connected clients
+        io.emit("messageReceived", formattedMessage);
+        console.log(`Broadcasted to all clients`);
+
+        // Also emit a session update event
+        io.emit("sessionUpdated", {
+          sessionId: String(sessionId),
+          lastMessage: message.content,
+          updatedAt: new Date().toISOString(),
+          status: "active",
+          role: "agent",
+        });
+
+        console.log("Socket events emitted successfully");
+      } else {
+        console.log("Socket.io instance not available for real-time updates");
+      }
+    } catch (error) {
+      console.error("Error emitting socket event:", error);
+      // Continue processing even if socket emission fails
+    }
+
+    // Return the created message to the agent UI
+    return NextResponse.json({
+      success: true,
+      message,
+      broadcast: true, // Flag to confirm message was broadcasted
+    });
   } catch (error) {
     console.error("Error creating message:", error);
     return NextResponse.json(
