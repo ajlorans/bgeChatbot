@@ -21,15 +21,12 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  // Optimize builds by controlling what happens during static generation
+  // Updated external packages config
   experimental: {
-    serverComponentsExternalPackages: ["prisma", "@prisma/client"],
-    staticWorkerRequestDeadline: 60,
+    serverExternalPackages: ["prisma", "@prisma/client"],
   },
   // Configure static and dynamic page behavior
   output: "standalone",
-  // Skip static optimization for database-heavy pages
-  unstable_excludeFiles: ["**/src/app/agent/sessions/**", "**/src/app/api/**"],
   // Redirect for agent dashboard
   async redirects() {
     return [

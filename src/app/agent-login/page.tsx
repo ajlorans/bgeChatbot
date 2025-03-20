@@ -5,11 +5,6 @@ import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import SimpleLogin from "./simple-login";
 
-export const metadata = {
-  title: "Agent Login",
-  description: "Login portal for customer support agents",
-};
-
 export const dynamic = "force-dynamic";
 
 export default function AgentLogin() {
