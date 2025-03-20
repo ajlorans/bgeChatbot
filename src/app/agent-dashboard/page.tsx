@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useSocket } from "@/contexts/SocketContext";
 import { useUser } from "@/components/UserProvider";
 
+// Add debug logging for when page renders
+console.log("DEBUG: Agent dashboard page component loaded");
+
 interface DashboardStats {
   activeSessions: number;
   waitingSessions: number;
