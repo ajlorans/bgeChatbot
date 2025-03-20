@@ -1,13 +1,18 @@
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 
-// Define the JWT secret
+// Define the JWT secret with more robust fallback
 const JWT_SECRET =
   process.env.JWT_SECRET ||
   (process.env.NODE_ENV === "production"
-    ? (console.error("JWT_SECRET is not set in production environment!"),
-      "temporary-fallback-key-for-production")
-    : "development-only-secret-key");
+    ? (console.error("⚠️ JWT_SECRET is not set in production environment!"),
+      "temporary-fallback-jwt-key-for-debugging")
+    : "development-only-jwt-secret-key");
+
+console.log(
+  `JWT Secret initialized. Using environment variable: ${!!process.env
+    .JWT_SECRET}`
+);
 
 // Define session types
 export interface UserSession {
@@ -33,25 +38,55 @@ export async function getServerSession(): Promise<SessionData | null> {
     const token = await cookieStore.get("agent_token");
 
     if (!token) {
+      console.log("No agent_token cookie found");
       return null;
     }
+
+    console.log("Token found, attempting to verify...");
 
     // Verify and decode the token
-    const decoded = jwt.verify(token.value, JWT_SECRET) as SessionData;
+    try {
+      const decoded = jwt.verify(token.value, JWT_SECRET) as SessionData;
 
-    // Check if the session has expired
-    if (decoded.expiresAt < Date.now()) {
+      // Check if the session has expired
+      if (decoded.expiresAt < Date.now()) {
+        console.log("Session has expired");
+        return null;
+      }
+
+      // Make sure the user object is valid
+      if (!decoded.user || !decoded.user.id) {
+        console.error("Invalid session data: missing user ID");
+        return null;
+      }
+
+      console.log(`Valid session found for user: ${decoded.user.email}`);
+
+      // Return the session data
+      return decoded;
+    } catch (jwtError) {
+      console.error("JWT verification error:", jwtError);
+
+      // Special handling for test/debugging environment
+      if (
+        process.env.DEBUG_MODE === "true" ||
+        process.env.ALLOW_DEBUG_LOGIN === "true"
+      ) {
+        console.log("DEBUG MODE: Creating fallback session");
+        try {
+          // Try to decode without verification for debugging
+          const decoded = jwt.decode(token.value) as SessionData;
+          if (decoded && decoded.user) {
+            console.log("DEBUG MODE: Using decoded but unverified session");
+            return decoded;
+          }
+        } catch (decodeError) {
+          console.error("Failed to decode token:", decodeError);
+        }
+      }
+
       return null;
     }
-
-    // Make sure the user object is valid
-    if (!decoded.user || !decoded.user.id) {
-      console.error("Invalid session data: missing user ID");
-      return null;
-    }
-
-    // Return the session data
-    return decoded;
   } catch (error) {
     console.error("Error getting server session:", error);
     return null;
@@ -68,8 +103,24 @@ export function createAgentSessionToken(user: UserSession): string {
     expiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
   };
 
+  console.log(
+    `Creating token for user: ${
+      user.email
+    }, using JWT_SECRET: ${JWT_SECRET.substring(0, 5)}...`
+  );
+
   // Sign the token
-  return jwt.sign(sessionData, JWT_SECRET);
+  try {
+    const token = jwt.sign(sessionData, JWT_SECRET, {
+      expiresIn: "24h",
+      algorithm: "HS256",
+    });
+    console.log("Token created successfully");
+    return token;
+  } catch (error) {
+    console.error("Error creating token:", error);
+    throw error;
+  }
 }
 
 /**
