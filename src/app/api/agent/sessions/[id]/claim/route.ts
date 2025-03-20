@@ -7,14 +7,14 @@ import { io } from "@/lib/socketService";
  * Route handler for claiming a session
  */
 export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  context: { params: { id: string } }
 ) {
   try {
-    // Get the session ID from the URL parameters
-    const sessionId = params.id;
+    // Get the session ID from context params
+    const sessionId = context.params.id;
 
-    // Get the authenticated user session
+    // Get the authenticated session
     const session = await getServerSession();
 
     // If no session or not an agent, return unauthorized
