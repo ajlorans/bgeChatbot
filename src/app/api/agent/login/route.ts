@@ -141,7 +141,10 @@ export async function POST(req: NextRequest) {
       // Check if this is a form submission (needs redirect) or JSON API call
       if (!req.headers.get("content-type")?.includes("application/json")) {
         console.log("➡️ Redirecting to agent dashboard after successful login");
-        response = NextResponse.redirect(new URL("/agent-dashboard", req.url));
+        response = NextResponse.redirect(
+          new URL("/agent-dashboard/", req.url),
+          303
+        );
       } else {
         console.log("📤 Returning JSON success response for mock user");
         response = NextResponse.json({
@@ -246,11 +249,14 @@ export async function POST(req: NextRequest) {
     // Create a response with the right status and data
     let response;
 
-    // Check if this is a form submission (needs redirect) or JSON API call (needs JSON response)
+    // Check if this is a form submission (needs redirect) or JSON API call
     if (!req.headers.get("content-type")?.includes("application/json")) {
       // For form submissions, redirect to the dashboard
       console.log("➡️ Redirecting to agent dashboard after successful login");
-      response = NextResponse.redirect(new URL("/agent-dashboard", req.url));
+      response = NextResponse.redirect(
+        new URL("/agent-dashboard/", req.url),
+        303
+      );
     } else {
       // For API calls, return JSON response
       console.log("📤 Returning JSON success response");

@@ -3,31 +3,28 @@ import type { NextRequest } from "next/server";
 
 // This function can be marked `async` if using `await` inside
 export function middleware(request: NextRequest) {
-  console.log("Middleware running for path:", request.nextUrl.pathname);
+  // Only protect agent-dashboard paths
+  if (request.nextUrl.pathname.startsWith("/agent-dashboard")) {
+    console.log("👮 Middleware checking auth for agent dashboard");
 
-  const token = request.cookies.get("agent_token");
-  const isAgentDashboard =
-    request.nextUrl.pathname.startsWith("/agent-dashboard");
-  const isAgentLogin = request.nextUrl.pathname.startsWith("/agent-login");
+    // Get the token
+    const token = request.cookies.get("agent_token");
 
-  // If this is the dashboard and no token, redirect to login
-  if (isAgentDashboard && !token) {
-    console.log("No agent token found, redirecting to login");
-    return NextResponse.redirect(new URL("/agent-login", request.url));
+    // If no token, redirect to login
+    if (!token) {
+      console.log("🔒 No agent token, redirecting to login");
+      return NextResponse.redirect(new URL("/agent-login", request.url));
+    }
+
+    // Token exists, allow access
+    console.log("✅ Agent token found, allowing access");
   }
 
-  // If this is the login page and token exists, redirect to dashboard
-  // This prevents redirect loops when accessing the dashboard directly
-  if (isAgentLogin && token) {
-    console.log("Agent token found on login page, redirecting to dashboard");
-    return NextResponse.redirect(new URL("/agent-dashboard", request.url));
-  }
-
-  // Default case: continue with the request
+  // For all other paths, just proceed
   return NextResponse.next();
 }
 
-// See "Matching Paths" below to learn more
+// Only match agent-dashboard paths, NOT login
 export const config = {
-  matcher: ["/agent-dashboard", "/agent-dashboard/:path*", "/agent-login"],
+  matcher: ["/agent-dashboard", "/agent-dashboard/:path*"],
 };
