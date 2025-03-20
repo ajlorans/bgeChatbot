@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import SimpleLogin from "./simple-login";
 
 export const dynamic = "force-dynamic";
 
 export default function AgentLogin() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const logoutParam = searchParams?.get("logout");
 
@@ -33,6 +34,53 @@ export default function AgentLogin() {
       console.error("Error during bypass:", error);
       // Fallback to direct URL
       window.location.href = "/agent-bypass";
+    }
+  };
+
+  // Handle login form submission with JSON
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    // Validate input
+    if (!email || !password) {
+      setError("Email and password are required");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/agent/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          redirectUrl: "/agent-dashboard",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Login failed");
+        setLoading(false);
+        return;
+      }
+
+      // Successful login - redirect
+      if (data.redirectTo) {
+        router.push(data.redirectTo);
+      } else {
+        router.push("/agent-dashboard/");
+      }
+    } catch (err) {
+      console.error("Login error:", err);
+      setError("An error occurred during login. Please try again.");
+      setLoading(false);
     }
   };
 
@@ -78,7 +126,7 @@ export default function AgentLogin() {
     return <SimpleLogin />;
   }
 
-  // Simple form submit - Leverage browser navigation to ensure proper redirect
+  // Form with JavaScript-based submission for JSON data
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
       <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-md">
@@ -110,22 +158,8 @@ export default function AgentLogin() {
           </div>
         )}
 
-        {/* Use regular form submission with action attribute for reliable page navigation */}
-        <form
-          method="POST"
-          action="/api/agent/login"
-          className="mt-8 space-y-6"
-          onSubmit={(e) => {
-            // Still validate but let the form POST handle navigation
-            if (!email || !password) {
-              e.preventDefault();
-              setError("Email and password are required");
-            }
-            setLoading(true);
-          }}
-        >
-          <input type="hidden" name="redirectUrl" value="/agent-dashboard" />
-
+        {/* Use JS-based form submission to ensure JSON format */}
+        <form onSubmit={handleLogin} className="mt-8 space-y-6">
           <div className="space-y-4">
             <div>
               <label
@@ -136,7 +170,6 @@ export default function AgentLogin() {
               </label>
               <input
                 id="email"
-                name="email"
                 type="email"
                 autoComplete="email"
                 required
@@ -156,7 +189,6 @@ export default function AgentLogin() {
               </label>
               <input
                 id="password"
-                name="password"
                 type="password"
                 autoComplete="current-password"
                 required

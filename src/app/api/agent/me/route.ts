@@ -1,124 +1,144 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { PrismaClient } from "@prisma/client";
 import jwt from "jsonwebtoken";
 
-// Use environment variables with fallbacks
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+const prisma = new PrismaClient();
 const DEBUG_MODE = process.env.DEBUG_MODE === "true";
+const JWT_SECRET =
+  process.env.JWT_SECRET || "fallback-secret-do-not-use-in-production";
 const USE_MOCK_DB = process.env.USE_MOCK_DB === "true";
 
-// Define the type for mock users
-type MockUserData = {
-  id: string;
+// Define the mock user type
+type MockUser = {
   agentId: string;
+  id: string;
   name: string;
   email: string;
   role: string;
   isActive: boolean;
   isAvailable: boolean;
+  activeSessions: number;
+  waitingSessions: number;
 };
 
-// Mock data for test users
-const MOCK_USERS: Record<string, MockUserData> = {
+// Sample mock data for testing without a database
+const MOCK_USERS: Record<string, MockUser> = {
   "agent@example.com": {
-    id: "agent-test-id",
-    agentId: "agent-id",
-    name: "Agent Test",
+    agentId: "mock-agent-1",
+    id: "user-1",
+    name: "Test Agent",
     email: "agent@example.com",
     role: "agent",
     isActive: true,
     isAvailable: true,
+    activeSessions: 1,
+    waitingSessions: 3,
   },
   "admin@example.com": {
-    id: "admin-test-id",
-    agentId: "admin-agent-id",
-    name: "Admin Test",
+    agentId: "mock-admin-1",
+    id: "user-2",
+    name: "Test Admin",
     email: "admin@example.com",
     role: "admin",
     isActive: true,
     isAvailable: true,
+    activeSessions: 0,
+    waitingSessions: 5,
   },
 };
 
+// Function to verify JWT token
+async function verifyToken(token: string) {
+  try {
+    // Verify the token with the secret
+    const decoded = jwt.verify(token, JWT_SECRET) as {
+      id: string;
+      email: string;
+      role: string;
+      agentId?: string;
+    };
+
+    return decoded;
+  } catch (error) {
+    console.error("[API] JWT verification error:", error);
+    throw new Error("Invalid token");
+  }
+}
+
 export async function GET(req: NextRequest) {
-  console.log("[API] GET /api/agent/me request received");
+  console.log("[API] GET /api/agent/me called");
 
   try {
     // Get token from cookies
     const token = req.cookies.get("agent_token")?.value;
 
+    // Log token presence (not the actual value for security)
+    console.log("[API] Token exists:", !!token);
+
+    // If no token, return 401 Unauthorized
     if (!token) {
-      console.log("[API] No agent token found in cookies");
+      console.log("[API] No token found in cookies");
       return NextResponse.json(
-        { error: "Authentication required" },
+        { error: "Unauthorized - No token provided" },
         { status: 401 }
       );
     }
 
-    console.log("[API] Found token, length:", token.length);
+    // Handle bypass token (for development)
+    if (
+      token.startsWith("BYPASS_TOKEN_") &&
+      process.env.NODE_ENV !== "production"
+    ) {
+      console.log("[API] Using bypass token");
+      return NextResponse.json({
+        ...MOCK_USERS["agent@example.com"],
+        bypassMode: true,
+      });
+    }
 
-    // Verify the token
-    let decodedToken;
+    // Verify the token - with proper error handling to prevent undefined.split error
+    let verified;
     try {
-      // Check for special bypass token format for testing
-      if (token.startsWith("debug-bypass-")) {
-        // Parse email from token for debug mode
-        const email = token.replace("debug-bypass-", "");
-        console.log("[API] Using debug bypass token for:", email);
+      verified = await verifyToken(token);
 
-        if (MOCK_USERS[email]) {
-          const userData = MOCK_USERS[email];
-          return NextResponse.json({
-            id: userData.agentId,
-            name: userData.name,
-            email: userData.email,
-            role: userData.role,
-            isActive: userData.isActive,
-            isAvailable: userData.isAvailable,
-            activeSessions: 0,
-            waitingSessions: 0,
-            debugMode: true,
-          });
-        }
-      }
-
-      // Normal JWT verification
-      decodedToken = jwt.verify(token, JWT_SECRET) as {
-        id: string;
-        email: string;
-        role: string;
-        agentId: string;
-      };
-      console.log("[API] Token verified for user:", decodedToken.email);
-    } catch (jwtError) {
-      console.error("[API] JWT verification failed:", jwtError);
-
-      // If we're in debug mode, give more information
-      if (DEBUG_MODE) {
-        return NextResponse.json(
-          {
-            error: "Invalid authentication token",
-            details: String(jwtError),
-            debugHelp:
-              "Make sure JWT_SECRET environment variable is correctly set",
-          },
-          { status: 401 }
-        );
-      }
-
+      // If token verification fails, it will throw an error that's caught in the catch block below
+      console.log("[API] Token verified successfully");
+    } catch (tokenError) {
+      console.log("[API] Token verification failed:", tokenError);
       return NextResponse.json(
-        { error: "Invalid authentication token" },
+        { error: "Invalid or expired token" },
         { status: 401 }
       );
+    }
+
+    // If we're here, token is valid and verified contains the decoded token data
+    const { email } = verified;
+
+    if (!email) {
+      console.log("[API] No email in token payload");
+      return NextResponse.json(
+        { error: "Invalid token format" },
+        { status: 400 }
+      );
+    }
+
+    // Debug mode - return mock data if enabled
+    if (process.env.DEBUG_MODE === "true") {
+      console.log("[API] Debug mode enabled, returning mock data");
+      return NextResponse.json({
+        ...MOCK_USERS["agent@example.com"],
+        email,
+        debugMode: true,
+      });
     }
 
     // If we're in mock DB mode, use hardcoded data
     if (USE_MOCK_DB || DEBUG_MODE) {
-      console.log("[API] Using mock data for", decodedToken.email);
+      console.log("[API] Using mock data for", email);
 
       // Check if this is a test account
-      if (MOCK_USERS[decodedToken.email]) {
-        const userData = MOCK_USERS[decodedToken.email];
+      if (MOCK_USERS[email]) {
+        const userData = MOCK_USERS[email];
         return NextResponse.json({
           id: userData.agentId,
           name: userData.name,
@@ -126,45 +146,36 @@ export async function GET(req: NextRequest) {
           role: userData.role,
           isActive: userData.isActive,
           isAvailable: userData.isAvailable,
-          activeSessions: 0,
-          waitingSessions: 0,
+          activeSessions: userData.activeSessions,
+          waitingSessions: userData.waitingSessions,
           mockData: true,
         });
       }
 
       // Fallback mock data
       return NextResponse.json({
-        id: decodedToken.agentId || "mock-agent-id",
-        name: decodedToken.email.split("@")[0] || "Mock Agent",
-        email: decodedToken.email,
-        role: decodedToken.role || "agent",
+        id: verified.agentId || "mock-agent-id",
+        name: email.split("@")[0] || "Mock Agent",
+        email: email,
+        role: verified.role || "agent",
         isActive: true,
         isAvailable: true,
         activeSessions: 0,
-        waitingSessions: 0,
+        waitingSessions: 2,
         mockData: true,
       });
     }
 
-    // If using a real DB, query for the user
     try {
       // Get the user from the database
       const user = await prisma.user.findUnique({
-        where: { id: decodedToken.id },
+        where: { email },
         include: { agent: true },
       });
 
-      if (!user) {
-        console.error(`[API] User not found for id: ${decodedToken.id}`);
-        return NextResponse.json({ error: "User not found" }, { status: 404 });
-      }
-
-      if (!user.agent) {
-        console.error(`[API] No agent profile for user: ${user.email}`);
-        return NextResponse.json(
-          { error: "No agent profile found" },
-          { status: 404 }
-        );
+      if (!user || !user.agent) {
+        console.error(`[API] User or agent not found for email: ${email}`);
+        return NextResponse.json({ error: "Agent not found" }, { status: 404 });
       }
 
       // Count active chat sessions
@@ -175,42 +186,47 @@ export async function GET(req: NextRequest) {
         },
       });
 
-      // Count waiting chat sessions
+      // Count waiting sessions
       const waitingSessions = await prisma.chatSession.count({
         where: {
+          agentId: null,
           status: "WAITING",
         },
       });
 
       // Return agent information
-      return NextResponse.json({
-        id: user.agent.id,
+      const response = {
+        id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
+        agentId: user.agent.id,
         isActive: user.agent.isActive,
         isAvailable: user.agent.isAvailable,
         activeSessions,
         waitingSessions,
-      });
+      };
+
+      console.log("[API] Successfully returned agent data");
+      return NextResponse.json(response);
     } catch (dbError) {
       console.error("[API] Database error:", dbError);
 
-      // If in debug mode, return detailed error
+      // In debug mode, return more details about the error
       if (DEBUG_MODE) {
         return NextResponse.json(
           {
             error: "Database error",
             details: String(dbError),
             fallback: {
-              id: decodedToken.agentId || "fallback-agent-id",
-              name: decodedToken.email.split("@")[0] || "Fallback Agent",
-              email: decodedToken.email,
-              role: decodedToken.role || "agent",
+              id: verified.agentId || "fallback-agent-id",
+              name: email.split("@")[0] || "Fallback Agent",
+              email: email,
+              role: verified.role || "agent",
               isActive: true,
               isAvailable: true,
               activeSessions: 0,
-              waitingSessions: 0,
+              waitingSessions: 2,
               debugFallback: true,
             },
           },
@@ -218,32 +234,26 @@ export async function GET(req: NextRequest) {
         );
       }
 
-      throw dbError; // Re-throw to be caught by outer handler
+      return NextResponse.json(
+        { error: "Error retrieving agent data" },
+        { status: 500 }
+      );
     }
-  } catch (error: unknown) {
-    console.error("[API] Error in agent/me endpoint:", error);
+  } catch (error) {
+    console.error("[API] Unhandled error in agent/me endpoint:", error);
 
-    // Special detailed error for Vercel environment variables
-    if (error instanceof Error && error.message.includes("ENV")) {
+    if (DEBUG_MODE) {
       return NextResponse.json(
         {
-          error: "Environment configuration error",
-          details: DEBUG_MODE ? error.message : "Check server logs for details",
-          tip: "Make sure JWT_SECRET and other required environment variables are set",
+          error: "Internal server error",
+          details: String(error),
         },
         { status: 500 }
       );
     }
 
     return NextResponse.json(
-      {
-        error: "Failed to retrieve agent information",
-        details: DEBUG_MODE
-          ? error instanceof Error
-            ? error.message
-            : String(error)
-          : "An internal server error occurred",
-      },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
