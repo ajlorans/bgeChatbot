@@ -2,21 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "@/lib/session";
 import { io } from "@/lib/socketService";
-import { RouteHandlerParams } from "@/lib/types";
-
-// Define the type for route parameters
-type RouteParams = { id: string };
 
 /**
  * Route handler for claiming a session
  */
 export async function POST(
   request: NextRequest,
-  context: RouteHandlerParams<RouteParams>
+  { params }: { params: { id: string } }
 ) {
   try {
     // Get the session ID from the URL parameters
-    const sessionId = context.params.id;
+    const sessionId = params.id;
 
     // Get the authenticated user session
     const session = await getServerSession();
