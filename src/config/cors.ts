@@ -3,6 +3,10 @@ export const getAllowedOrigins = () => {
   const env = process.env.NODE_ENV || "development";
 
   if (env === "production") {
+    // TEMPORARY FIX: Allow all origins in production until we debug CORS issues
+    return ["*"];
+
+    /* Original code - to be restored after debugging
     // Get origins from environment variable
     const allowedOriginsFromEnv = process.env.ALLOWED_ORIGINS || "";
     const originsArray = allowedOriginsFromEnv.split(",").filter(Boolean);
@@ -31,6 +35,7 @@ export const getAllowedOrigins = () => {
     }
 
     return originsArray;
+    */
   }
 
   return [
@@ -44,12 +49,14 @@ export const getAllowedOrigins = () => {
 
 // CORS configuration
 export const corsConfig = {
-  methods: ["GET", "POST", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: [
     "Content-Type",
     "Authorization",
     "Origin",
     "X-Requested-With",
+    "Accept",
+    "X-CSRF-Token",
   ],
   maxAge: 86400, // 24 hours
   credentials: true,

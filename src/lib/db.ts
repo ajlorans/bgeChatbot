@@ -15,8 +15,45 @@ function getPrismaClient() {
     return {
       $connect: () => Promise.resolve(),
       $disconnect: () => Promise.resolve(),
-      // Add other methods you might use during build as needed
-      // e.g., a mock for specific models/tables you access during build
+      // Add mock implementations for commonly used methods
+      user: {
+        findUnique: () => Promise.resolve(null),
+        findFirst: () => Promise.resolve(null),
+        findMany: () => Promise.resolve([]),
+        count: () => Promise.resolve(0),
+        create: (data: any) => Promise.resolve({ id: "mock-id", ...data.data }),
+        update: (data: any) => Promise.resolve({ id: "mock-id", ...data.data }),
+      },
+      agent: {
+        findUnique: () => Promise.resolve(null),
+        findFirst: () => Promise.resolve(null),
+        findMany: () => Promise.resolve([]),
+        count: () => Promise.resolve(0),
+        create: (data: any) => Promise.resolve({ id: "mock-id", ...data.data }),
+        update: (data: any) => Promise.resolve({ id: "mock-id", ...data.data }),
+      },
+      chatSession: {
+        findUnique: () => Promise.resolve(null),
+        findFirst: () => Promise.resolve(null),
+        findMany: () => Promise.resolve([]),
+        count: () => Promise.resolve(0),
+        create: (data: any) => Promise.resolve({ id: "mock-id", ...data.data }),
+        update: (data: any) => Promise.resolve({ id: "mock-id", ...data.data }),
+      },
+      message: {
+        findMany: () => Promise.resolve([]),
+        count: () => Promise.resolve(0),
+        create: (data: any) => Promise.resolve({ id: "mock-id", ...data.data }),
+      },
+      session: {
+        findUnique: () => Promise.resolve(null),
+        findFirst: () => Promise.resolve(null),
+        findMany: () => Promise.resolve([]),
+        create: (data: any) => Promise.resolve({ id: "mock-id", ...data.data }),
+        delete: () => Promise.resolve({ id: "mock-id" }),
+      },
+      $queryRaw: () => Promise.resolve([{ count: 0 }]),
+      $transaction: (queries: any) => Promise.resolve(queries.map(() => ({}))),
     } as unknown as PrismaClient;
   }
 
