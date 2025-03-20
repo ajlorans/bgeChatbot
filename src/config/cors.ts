@@ -1,12 +1,12 @@
 // Environment-based allowed origins
 export const getAllowedOrigins = () => {
+  // TEMPORARY FIX: Always return wildcard during debugging
+  return ["*"];
+
+  /* Original implementation to be restored after debugging
   const env = process.env.NODE_ENV || "development";
 
   if (env === "production") {
-    // TEMPORARY FIX: Allow all origins in production until we debug CORS issues
-    return ["*"];
-
-    /* Original code - to be restored after debugging
     // Get origins from environment variable
     const allowedOriginsFromEnv = process.env.ALLOWED_ORIGINS || "";
     const originsArray = allowedOriginsFromEnv.split(",").filter(Boolean);
@@ -35,7 +35,6 @@ export const getAllowedOrigins = () => {
     }
 
     return originsArray;
-    */
   }
 
   return [
@@ -45,11 +44,12 @@ export const getAllowedOrigins = () => {
     "http://127.0.0.1:3001",
     "*", // Add wildcard to support all local development scenarios
   ];
+  */
 };
 
 // CORS configuration
 export const corsConfig = {
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
   allowedHeaders: [
     "Content-Type",
     "Authorization",
@@ -57,6 +57,10 @@ export const corsConfig = {
     "X-Requested-With",
     "Accept",
     "X-CSRF-Token",
+    "Cache-Control",
+    "X-Auth-Token",
+    "X-Socket-ID",
+    "Cookie",
   ],
   maxAge: 86400, // 24 hours
   credentials: true,
