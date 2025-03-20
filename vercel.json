@@ -8,22 +8,17 @@
     {
       "source": "/api/(.*)",
       "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=0, must-revalidate"
-        },
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        },
+        { "key": "Access-Control-Allow-Credentials", "value": "true" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
         {
           "key": "Access-Control-Allow-Methods",
-          "value": "GET, POST, OPTIONS, PUT, DELETE"
+          "value": "GET,OPTIONS,PATCH,DELETE,POST,PUT"
         },
         {
           "key": "Access-Control-Allow-Headers",
-          "value": "X-Requested-With, Content-Type, Accept, Authorization"
-        }
+          "value": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization"
+        },
+        { "key": "Cache-Control", "value": "no-store" }
       ]
     },
     {
@@ -45,6 +40,12 @@
       ]
     }
   ],
+  "functions": {
+    "src/pages/api/socket.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  },
   "env": {
     "PRISMA_SCHEMA_DISABLE_ADVISORY_LOCK": "true",
     "PRISMA_CLIENT_ENGINE_TYPE": "binary",
@@ -59,6 +60,7 @@
     "ALLOW_DEBUG_LOGIN": "true",
     "NODE_ENV": "production",
     "CORS_ALLOW_ALL": "true",
-    "DEBUG_MODE": "true"
+    "DEBUG_MODE": "true",
+    "DATABASE_URL": "mysql://user:password@host:3306/database"
   }
 }
