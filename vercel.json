@@ -37,9 +37,7 @@
     "PRISMA_SCHEMA_DISABLE_ADVISORY_LOCK": "true",
     "PRISMA_CLIENT_ENGINE_TYPE": "binary",
     "POSTGRES_PRISMA_URL": "${env.DATABASE_URL}?pgbouncer=true&connection_limit=1&pool_timeout=20",
-    "POSTGRES_URL_NON_POOLING": "${env.DATABASE_URL}?connection_limit=1"
-  },
-  "buildEnvironment": {
+    "POSTGRES_URL_NON_POOLING": "${env.DATABASE_URL}?connection_limit=1",
     "NEXT_PHASE": "phase-production-build",
     "NEXT_TELEMETRY_DISABLED": "1",
     "NEXT_DISABLE_SOURCEMAPS": "1",
