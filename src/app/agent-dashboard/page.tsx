@@ -24,72 +24,101 @@ export default function AgentDashboardPage() {
   const socketContext = useSocket();
   const isConnected = socketContext?.isConnected || false;
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [agentData, setAgentData] = useState<AgentData | null>(null);
+  const [agent, setAgent] = useState<AgentData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [apiAttempts, setApiAttempts] = useState(0);
-  const [isRetrying, setIsRetrying] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [useDebugMode, setUseDebugMode] = useState(false);
 
-  // Fetch agent data from the API
-  useEffect(() => {
-    async function fetchAgentData() {
-      try {
-        console.log("Fetching agent data...");
-        setIsLoading(true);
+  // Function to fetch agent data with retry logic
+  async function fetchAgentData() {
+    try {
+      setLoading(true);
+      setError(null);
 
-        const response = await fetch("/api/agent/me", {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include", // Important for cookies
-        });
+      console.log("Fetching agent data...");
+      const res = await fetch("/api/agent/me", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include", // Include cookies
+      });
 
-        console.log("API Response status:", response.status);
+      if (!res.ok) {
+        // If the response is not OK, try to parse the error message
+        const errorData = await res
+          .json()
+          .catch(() => ({ error: "Unknown error" }));
+        console.error("Failed to fetch agent data:", errorData);
 
-        if (!response.ok) {
-          // If unauthorized, redirect to login
-          if (response.status === 401) {
-            console.error("Not authenticated, redirecting to login");
-            router.push("/login/agent");
-            return;
-          }
-
-          // Try to get error details from response
-          let errorMessage = "Failed to fetch agent data";
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.error || errorMessage;
-          } catch (_) {
-            // Ignore JSON parse errors
-          }
-
-          setError(errorMessage);
-          setApiAttempts((prev) => prev + 1);
-          return;
+        if (res.status === 401) {
+          console.log("Not authenticated, redirecting to login");
+          throw new Error("Not authenticated");
+        } else {
+          throw new Error(errorData.error || `Server error: ${res.status}`);
         }
+      }
 
-        const data = await response.json();
-        console.log("Agent data loaded:", data);
-        setAgentData(data);
-        setError(null);
-        setIsLoading(false);
-      } catch (err) {
-        console.error("Error fetching agent data:", err);
-        setError("Network error while fetching agent data");
-        setApiAttempts((prev) => prev + 1);
-      } finally {
-        setIsLoading(false);
-        setIsRetrying(false);
+      const data = await res.json();
+      console.log("Agent data:", data);
+      setAgent(data);
+      setLoading(false);
+      // Reset retry count on success
+      setRetryCount(0);
+    } catch (err: any) {
+      setLoading(false);
+      setError(err.message || "Failed to load agent data");
+
+      // If we reach max retries, try debug mode
+      if (retryCount >= 2 && !useDebugMode) {
+        console.log("Maximum retries reached, enabling debug mode");
+        setUseDebugMode(true);
+      } else if (!useDebugMode) {
+        // Increment retry count and try again shortly
+        setRetryCount((prev) => prev + 1);
+        console.log(`Retry attempt ${retryCount + 1}/3 in 2 seconds...`);
+        setTimeout(fetchAgentData, 2000);
       }
     }
+  }
 
+  // When the component mounts, fetch agent data
+  useEffect(() => {
     fetchAgentData();
-  }, [router, isRetrying]);
+  }, []);
+
+  // If in debug mode, provide a fallback experience
+  useEffect(() => {
+    if (useDebugMode) {
+      console.log("Using debug mode fallback");
+      setAgent({
+        id: "debug-agent-id",
+        name: "Debug Agent",
+        email: "agent@example.com",
+        role: "agent",
+        isActive: true,
+        isAvailable: true,
+        debugFallback: true,
+      });
+      setLoading(false);
+      setError(null);
+    }
+  }, [useDebugMode]);
+
+  // Handle authentication failure
+  useEffect(() => {
+    if (error === "Not authenticated") {
+      console.log("Redirecting to login page due to authentication error");
+      setTimeout(() => {
+        router.push("/agent-login");
+      }, 1000);
+    }
+  }, [error, router]);
 
   // Check socket connection
   useEffect(() => {
-    if (!isConnected && !isLoading && !error) {
+    if (!isConnected && !loading && !error) {
       toast({
         title: "Socket Connection Issue",
         description:
@@ -98,50 +127,9 @@ export default function AgentDashboardPage() {
         duration: 5000,
       });
     }
-  }, [isConnected, isLoading, error, toast]);
+  }, [isConnected, loading, error, toast]);
 
-  // Add retry capability if API fails
-  useEffect(() => {
-    // If we've had errors but fewer than 3 attempts, retry after delay
-    if (error && apiAttempts < 3 && !isRetrying) {
-      const timer = setTimeout(() => {
-        console.log(`Retrying API (attempt ${apiAttempts + 1} of 3)...`);
-        setIsRetrying(true);
-      }, 2000); // 2 second delay between retries
-
-      return () => clearTimeout(timer);
-    }
-  }, [error, apiAttempts, isRetrying]);
-
-  // Fall back to debug mode after multiple failures if appropriate
-  useEffect(() => {
-    if (error && apiAttempts >= 3) {
-      console.log("Using debug fallback mode after multiple API failures");
-
-      // Create a fallback agent for viewing the dashboard
-      setAgentData({
-        id: "fallback-agent",
-        name: "Debug Agent",
-        role: "agent",
-        isActive: true,
-        isAvailable: true,
-        activeSessions: 0,
-        waitingSessions: 0,
-        debugFallback: true,
-      });
-
-      setError(null);
-      toast({
-        title: "Debug Mode Activated",
-        description:
-          "Using fallback mode due to API issues. Limited functionality available.",
-        variant: "warning",
-        duration: 5000,
-      });
-    }
-  }, [apiAttempts, error, toast]);
-
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="h-screen flex items-center justify-center">
         <div className="text-center">
@@ -152,27 +140,37 @@ export default function AgentDashboardPage() {
     );
   }
 
-  if (error && apiAttempts < 3) {
+  if (error && !useDebugMode) {
     return (
       <div className="h-screen flex items-center justify-center">
         <div className="text-center max-w-md p-6 bg-destructive/10 rounded-lg">
           <h2 className="text-xl font-bold mb-2">Error Loading Dashboard</h2>
           <p className="mb-4">{error}</p>
           <p className="text-sm text-muted-foreground mb-4">
-            Retrying automatically... ({apiAttempts}/3 attempts)
+            {retryCount < 3
+              ? `Retrying automatically (${retryCount}/3)...`
+              : "We're having trouble connecting to the server."}
           </p>
           <button
-            onClick={() => setIsRetrying(true)}
+            onClick={fetchAgentData}
             className="px-4 py-2 bg-primary text-white rounded-md"
           >
-            Retry Now
+            Try Again
           </button>
+          {retryCount >= 2 && (
+            <button
+              onClick={() => setUseDebugMode(true)}
+              className="ml-4 px-4 py-2 bg-blue-600 text-white rounded-md"
+            >
+              Use Debug Mode
+            </button>
+          )}
         </div>
       </div>
     );
   }
 
-  if (!agentData) {
+  if (!agent) {
     return (
       <div className="h-screen flex items-center justify-center">
         <div className="text-center max-w-md p-6 bg-destructive/10 rounded-lg">
@@ -191,9 +189,9 @@ export default function AgentDashboardPage() {
 
   return (
     <AgentDashboardLayout
-      agent={agentData}
+      agent={agent}
       isConnected={isConnected}
-      isFallbackMode={agentData?.debugFallback || false}
+      isFallbackMode={agent?.debugFallback || false}
     />
   );
 }

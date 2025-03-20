@@ -70,8 +70,8 @@ const JWT_SECRET =
   process.env.JWT_SECRET ||
   (process.env.NODE_ENV === "production"
     ? (console.error("JWT_SECRET is not set in production environment!"),
-      "temporary-fallback-key-for-production")
-    : "development-only-secret-key");
+      "temporary-fallback-secret-key")
+    : "development-secret-key");
 
 // Initialize with socket.io server
 export const initSocketServer = (
@@ -129,77 +129,199 @@ export const initSocketServer = (
 
   // Middleware for authentication
   io.use(async (socket, next) => {
-    const cookies = socket.handshake.headers.cookie;
-
-    // Allow unauthenticated connections (for customers)
-    if (!cookies) {
-      console.log(
-        "No cookies found, allowing unauthenticated connection for customer"
-      );
-      socket.data.user = {
-        id: `guest-${Date.now()}`,
-        role: "customer",
-        agentId: null,
-      };
-      return next();
-    }
-
-    const parsedCookies = parse(cookies);
-    const token = parsedCookies.agent_token || parsedCookies.token;
-
-    // If no token, still allow connection as guest
-    if (!token) {
-      console.log(
-        "No token found, allowing unauthenticated connection for customer"
-      );
-      socket.data.user = {
-        id: `guest-${Date.now()}`,
-        role: "customer",
-        agentId: null,
-      };
-      return next();
-    }
-
     try {
-      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      const cookies = socket.handshake.headers.cookie;
 
-      // Check if user exists
-      const user = await prisma.user.findUnique({
-        where: {
-          id: decoded.user?.id,
-        },
-        include: {
-          agent: true,
-        },
-      });
+      // Log cookies for debugging
+      if (process.env.DEBUG_MODE === "true") {
+        console.log(`Socket auth - cookies present: ${!!cookies}`);
+        if (cookies) {
+          try {
+            const parsedCookies = parse(cookies);
+            console.log(
+              "Socket cookies:",
+              Object.keys(parsedCookies).join(", ")
+            );
+          } catch (e) {
+            console.error("Error parsing cookies:", e);
+          }
+        }
+      }
 
-      if (!user) {
+      // Allow unauthenticated connections (for customers)
+      if (!cookies) {
         console.log(
-          "User not found in database but allowing connection as guest"
+          "No cookies found, allowing unauthenticated connection for customer"
         );
         socket.data.user = {
           id: `guest-${Date.now()}`,
           role: "customer",
-          agentId: null,
         };
         return next();
       }
 
-      // Attach user data to socket
-      socket.data.user = {
-        id: decoded.user?.id,
-        role: user.role,
-        agentId: user.agent?.id,
-      };
+      // Parse cookies and look for tokens
+      let parsedCookies;
+      try {
+        parsedCookies = parse(cookies);
+      } catch (e) {
+        console.error("Error parsing cookies:", e);
+        socket.data.user = {
+          id: `guest-${Date.now()}`,
+          role: "customer",
+        };
+        return next();
+      }
 
-      next();
-    } catch (error) {
-      console.error("JWT verification error:", error);
-      // Still allow connection as guest
+      const token = parsedCookies.agent_token || parsedCookies.token;
+
+      // Log token details for debugging
+      if (process.env.DEBUG_MODE === "true") {
+        console.log(`Socket auth - token present: ${!!token}`);
+        if (token) {
+          console.log(
+            `Token length: ${token.length}, starts with: ${token.substring(
+              0,
+              10
+            )}...`
+          );
+        }
+      }
+
+      // If no token, still allow connection as guest
+      if (!token) {
+        console.log(
+          "No token found, allowing unauthenticated connection for customer"
+        );
+        socket.data.user = {
+          id: `guest-${Date.now()}`,
+          role: "customer",
+        };
+        return next();
+      }
+
+      try {
+        // More robust JWT verification with helpful error message
+        let decoded;
+        try {
+          decoded = jwt.verify(token, JWT_SECRET) as any;
+        } catch (jwtError) {
+          console.error("JWT verification failed:", jwtError.message);
+
+          // If in debug mode, create a debug token
+          if (process.env.DEBUG_MODE === "true") {
+            console.log("DEBUG MODE: Creating a test agent user for socket");
+            socket.data.user = {
+              id: "agent-test-id",
+              role: "agent",
+              agentId: "agent-id",
+            };
+            return next();
+          }
+
+          // Otherwise, fall back to guest
+          socket.data.user = {
+            id: `guest-${Date.now()}`,
+            role: "customer",
+          };
+          return next();
+        }
+
+        // Check if user ID exists in decoded payload
+        if (!decoded?.user?.id) {
+          console.error("Invalid token format - missing user.id in payload");
+          socket.data.user = {
+            id: `guest-${Date.now()}`,
+            role: "customer",
+          };
+          return next();
+        }
+
+        // Check if user exists - with error handling
+        try {
+          // Debug user check for faster development testing
+          if (
+            process.env.DEBUG_MODE === "true" &&
+            (decoded.user.id === "agent-test-id" ||
+              decoded.user.id === "admin-test-id")
+          ) {
+            console.log("DEBUG MODE: Using fast-path for test agent");
+            socket.data.user = {
+              id: decoded.user.id,
+              role: decoded.user.role || "agent",
+              agentId:
+                decoded.user.id === "admin-test-id"
+                  ? "admin-agent-id"
+                  : "agent-id",
+            };
+            return next();
+          }
+
+          // Normal database lookup
+          const user = await prisma.user.findUnique({
+            where: {
+              id: decoded.user.id,
+            },
+            include: {
+              agent: true,
+            },
+          });
+
+          if (!user) {
+            console.log(
+              "User not found in database but allowing connection as guest"
+            );
+            socket.data.user = {
+              id: `guest-${Date.now()}`,
+              role: "customer",
+            };
+            return next();
+          }
+
+          // Attach user data to socket
+          socket.data.user = {
+            id: decoded.user.id,
+            role: user.role,
+            agentId: user.agent?.id,
+          };
+
+          next();
+        } catch (dbError) {
+          console.error("Database error when verifying user:", dbError);
+
+          // If in debug mode, use the decoded user data directly
+          if (process.env.DEBUG_MODE === "true") {
+            console.log("DEBUG MODE: Using decoded token data due to DB error");
+            socket.data.user = {
+              id: decoded.user.id,
+              role: decoded.user.role || "customer",
+              agentId: decoded.user.agentId,
+            };
+            return next();
+          }
+
+          // Fallback to guest user
+          socket.data.user = {
+            id: `guest-${Date.now()}`,
+            role: "customer",
+          };
+          return next();
+        }
+      } catch (error) {
+        console.error("General socket authentication error:", error);
+        // Still allow connection as guest
+        socket.data.user = {
+          id: `guest-${Date.now()}`,
+          role: "customer",
+        };
+        return next();
+      }
+    } catch (outerError) {
+      // Catch-all error handler to ensure socket connections are always allowed
+      console.error("Critical socket auth error:", outerError);
       socket.data.user = {
         id: `guest-${Date.now()}`,
         role: "customer",
-        agentId: null,
       };
       return next();
     }

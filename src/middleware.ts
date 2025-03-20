@@ -1,66 +1,73 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-// Debug function to log cookie details
-function debugCookies(req: NextRequest, message: string) {
-  if (process.env.DEBUG_MODE === "true") {
-    console.log(`[DEBUG][MIDDLEWARE] ${message}`);
-    console.log(`Cookies: ${req.cookies.toString()}`);
-    req.cookies.getAll().forEach((cookie) => {
-      console.log(`Cookie ${cookie.name}: ${cookie.value}`);
-    });
+const DEBUG_MODE = process.env.DEBUG_MODE === "true";
+
+// Debug function to inspect cookies
+function debugCookies(req: NextRequest, context: string) {
+  if (!DEBUG_MODE) return;
+
+  console.log(`[Middleware Debug ${context}]`);
+  console.log(`  URL: ${req.nextUrl.pathname}`);
+  console.log(`  Cookies: ${req.cookies.toString()}`);
+
+  const agentToken = req.cookies.get("agent_token");
+  console.log(`  Agent Token: ${agentToken ? "Present" : "Not present"}`);
+
+  if (agentToken) {
+    console.log(`  Token Value: ${agentToken.value.substring(0, 15)}...`);
   }
 }
 
-export async function middleware(req: NextRequest) {
-  // Debug logging for request URL
-  if (process.env.DEBUG_MODE === "true") {
-    console.log(
-      `[MIDDLEWARE] Processing ${req.method} request to ${req.nextUrl.pathname}`
-    );
-  }
+export function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+  debugCookies(req, "Start");
 
-  // Skip middleware for API routes, static files, and agent login page
-  if (
-    req.nextUrl.pathname.startsWith("/api") ||
-    req.nextUrl.pathname.startsWith("/_next") ||
-    req.nextUrl.pathname.startsWith("/login/agent") ||
-    req.nextUrl.pathname === "/agent-login" ||
-    req.nextUrl.pathname === "/agent"
-  ) {
-    debugCookies(req, `Skipping middleware for ${req.nextUrl.pathname}`);
+  // Skip middleware for API routes to prevent API access issues
+  if (pathname.startsWith("/api/")) {
+    console.log("[Middleware] Skipping API route:", pathname);
     return NextResponse.next();
   }
 
-  // For agent dashboard paths, enforce authentication
-  if (req.nextUrl.pathname.startsWith("/agent-dashboard")) {
-    debugCookies(req, `Checking auth for ${req.nextUrl.pathname}`);
-    const token = req.cookies.get("agent_token");
+  // Skip middleware for static files and favicon
+  if (
+    pathname.match(/\.(jpg|jpeg|png|gif|ico|svg|webp|css|js|woff|woff2)$/) ||
+    pathname === "/favicon.ico"
+  ) {
+    return NextResponse.next();
+  }
 
-    // Handle agent dashboard access (must have agent_token)
-    if (!token) {
-      console.log("[MIDDLEWARE] No agent_token found, redirecting to login");
-      return NextResponse.redirect(new URL("/login/agent", req.url));
+  // Skip middleware for the login page to prevent redirect loops
+  if (pathname === "/agent-login") {
+    console.log("[Middleware] Allowing access to login page");
+    return NextResponse.next();
+  }
+
+  // If trying to access the agent dashboard
+  if (pathname.startsWith("/agent-dashboard")) {
+    // Check if agent token exists
+    const agentToken = req.cookies.get("agent_token");
+
+    if (!agentToken) {
+      console.log("[Middleware] No agent token found, redirecting to login");
+
+      // Redirect to login page
+      const url = new URL("/agent-login", req.url);
+      return NextResponse.redirect(url);
     }
 
-    // Agent is authenticated, proceed to dashboard
-    debugCookies(req, "Agent authenticated, proceeding to dashboard");
+    // Allow access to agent dashboard if token exists
+    console.log("[Middleware] Agent token found, allowing access to dashboard");
     return NextResponse.next();
   }
 
-  // Default: Allow access to all other routes
+  // For all other routes, proceed
   return NextResponse.next();
 }
 
-// Specify routes that should be checked by middleware
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for:
-     * - api routes (handled separately by API logic)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (browser icon)
-     */
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
+    // Match all paths except for those starting with specified patterns
+    "/((?!_next/static|_next/image|favicon.ico|public/).*)",
   ],
 };

@@ -12,6 +12,15 @@ export interface UserSession {
   [key: string]: string | number | boolean | Date | undefined; // Specify types for additional properties
 }
 
+interface TokenData {
+  id: string;
+  email: string;
+  role: string;
+  agentId: string;
+  iat?: number;
+  exp?: number;
+}
+
 /**
  * Generate a JWT token for a user session
  * @param payload User data to encode in the token
@@ -43,25 +52,15 @@ export function generateToken(
 
 /**
  * Verify and decode a JWT token
- * @param token JWT token to verify
- * @returns Decoded token payload or null if invalid
+ * @param token The JWT token to verify
+ * @returns The decoded token data or null if invalid
  */
-export function verifyToken(token: string): UserSession | null {
+export function verifyToken(token: string): TokenData | null {
   try {
-    // Ensure we have a JWT secret
-    if (!JWT_SECRET) {
-      console.error("JWT_SECRET is not defined");
-      return null;
-    }
-
-    // Convert secret to Buffer to solve TypeScript issues
-    const secretBuffer = Buffer.from(JWT_SECRET, "utf-8");
-
-    // Verify and decode token
-    const decoded = jwt.verify(token, secretBuffer) as UserSession;
+    const decoded = jwt.verify(token, JWT_SECRET) as TokenData;
     return decoded;
   } catch (error) {
-    console.error("Invalid token:", error);
+    console.error("Token verification failed:", error);
     return null;
   }
 }
@@ -73,9 +72,29 @@ export function verifyToken(token: string): UserSession | null {
  */
 export function getUserFromToken(cookieValue: string): UserSession | null {
   try {
-    return verifyToken(cookieValue);
+    return verifyToken(cookieValue) as UserSession;
   } catch (error) {
     console.error("Failed to get user from token:", error);
     return null;
   }
+}
+
+/**
+ * Create a JWT token for an agent
+ * @param data The data to encode in the token
+ * @returns The JWT token
+ */
+export function createAgentToken(data: Omit<TokenData, "iat" | "exp">): string {
+  return jwt.sign(data, JWT_SECRET, { expiresIn: "7d" });
+}
+
+/**
+ * Get the agent token from the request cookies
+ * @param cookies The request cookies
+ * @returns The token value or undefined if not found
+ */
+export function getAgentTokenFromCookies(cookies: {
+  get: (name: string) => { value: string } | undefined;
+}): string | undefined {
+  return cookies.get("agent_token")?.value;
 }

@@ -127,14 +127,14 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
   // Socket initialization effect
   useEffect(() => {
-    // Initialize socket connection
+    // Initialize socket connection with more aggressive reconnection strategy
     const socketInstance = io({
       path: "/api/socket",
       autoConnect: true,
       reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 2000,
-      timeout: 20000,
+      reconnectionAttempts: 20, // Increased from 10
+      reconnectionDelay: 1000, // Decreased from 2000
+      timeout: 10000, // Decreased from 20000
       transports: ["polling", "websocket"],
       withCredentials: true,
     });
@@ -153,20 +153,46 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
     socketInstance.on("connect_error", (error) => {
       console.error("Socket connection error:", error.message);
-      // Retry connection with polling only if websocket fails
-      if (socketInstance.io.opts.transports?.includes("websocket")) {
+
+      // Fall back to polling transport if websocket is problematic
+      if (
+        error.message.includes("websocket") ||
+        socketInstance.io.opts.transports?.includes("websocket")
+      ) {
         console.log("Retrying connection with polling transport only");
         socketInstance.io.opts.transports = ["polling"];
       }
+
+      // Add a short delay and then try to reconnect
+      setTimeout(() => {
+        if (!socketInstance.connected) {
+          console.log("Attempting to manually reconnect socket...");
+          socketInstance.connect();
+        }
+      }, 3000);
     });
 
+    // Handle disconnections with auto-reconnect strategy
     socketInstance.on("disconnect", (reason) => {
       console.log("Socket disconnected, reason:", reason);
       setIsConnected(false);
+
+      // If the disconnection wasn't initiated by the client, try to reconnect
+      if (reason !== "io client disconnect") {
+        // Shorter delay for reconnection attempts
+        setTimeout(() => {
+          console.log("Attempting to reconnect after disconnection...");
+          if (!socketInstance.connected) {
+            socketInstance.connect();
+          }
+        }, 1500);
+      }
     });
 
+    // Handle explicit errors
     socketInstance.on("error", (error) => {
       console.error("Socket error:", error);
+      // Don't kill the connection on errors, just log them
     });
 
     socketInstance.on("messageReceived", (message) => {

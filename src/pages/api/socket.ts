@@ -14,34 +14,28 @@ export default function handler(
 
   try {
     // Add CORS headers for socket communication with more permissive settings
-    const allowedOrigins =
+    // Always allow all origins in development and when specified in env vars
+    const allowAll =
       process.env.CORS_ALLOW_ALL === "true" ||
-      process.env.NODE_ENV !== "production"
-        ? "*"
-        : process.env.ALLOWED_ORIGINS?.split(",") || [
-            "https://bge-chatbot.vercel.app",
-            "http://localhost:3000",
-          ];
+      process.env.NODE_ENV !== "production" ||
+      process.env.DEBUG_MODE === "true";
+
+    const allowedOrigins = allowAll
+      ? "*"
+      : process.env.ALLOWED_ORIGINS?.split(",") || [
+          "https://bge-chatbot.vercel.app",
+          "http://localhost:3000",
+        ];
 
     const origin = req.headers.origin || "";
     console.log("🌐 Request from origin:", origin);
     console.log("✅ Allowed origins:", allowedOrigins);
 
-    // Set CORS headers
-    if (allowedOrigins === "*") {
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      console.log("🌐 Setting CORS allow all origins");
-    } else if (
-      Array.isArray(allowedOrigins) &&
-      (allowedOrigins.includes(origin) || origin === "")
-    ) {
-      res.setHeader("Access-Control-Allow-Origin", origin || "*");
-      console.log(`🌐 Setting CORS for specific origin: ${origin || "*"}`);
-    } else {
-      // If origin not in allowed list but we need to respond, use * for development
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      console.log(`⚠️ Origin not in allowed list, using fallback CORS "*"`);
-    }
+    // Set CORS headers - always allow any origin for socket.io to work properly
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    console.log(
+      "🌐 Setting CORS allow all origins for Socket.IO compatibility"
+    );
 
     res.setHeader("Access-Control-Allow-Credentials", "true");
     res.setHeader(
@@ -101,11 +95,13 @@ export default function handler(
   }
 }
 
-// Configure Next.js to handle WebSockets
+// Configure Next.js to handle WebSockets with shorter timeout
 export const config = {
   api: {
     bodyParser: false,
     externalResolver: true,
     responseLimit: false,
   },
+  // Reduce function duration to avoid timeouts
+  maxDuration: 10, // 10 seconds instead of default 60s
 };

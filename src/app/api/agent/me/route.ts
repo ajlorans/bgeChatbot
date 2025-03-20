@@ -1,128 +1,128 @@
-import { getServerSession } from "next-auth";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import jwt from "jsonwebtoken";
 
-export async function GET() {
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+const DEBUG_MODE = process.env.DEBUG_MODE === "true";
+
+export async function GET(req: NextRequest) {
+  console.log("[API] GET /api/agent/me request received");
+
   try {
-    // Get the session data from the server
-    const session = await getServerSession();
-    console.log("Agent/me API: Session data:", JSON.stringify(session));
+    // Get token from cookies
+    const token = req.cookies.get("agent_token")?.value;
 
-    // Check if the user is authenticated
-    if (!session || !session.user) {
-      console.error("Agent/me API: No authenticated session found");
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
-
-    const userEmail = session.user.email;
-    if (!userEmail) {
-      console.error("Agent/me API: Missing email in session");
+    if (!token) {
+      console.log("[API] No agent token found in cookies");
       return NextResponse.json(
-        { error: "Invalid session data - missing email" },
+        { error: "Authentication required" },
         { status: 401 }
       );
     }
 
-    // Find the user by email
-    console.log(`Agent/me API: Finding user with email ${userEmail}`);
-    const user = await prisma.user.findUnique({
-      where: { email: userEmail },
-    });
-
-    // If no user found, return 401
-    if (!user) {
-      console.error(`Agent/me API: No user found for email ${userEmail}`);
-
-      // If in debug mode, return mock data
-      if (process.env.DEBUG_MODE === "true") {
-        console.log("DEBUG MODE: Returning mock agent data");
-        return NextResponse.json({
-          id: "debug-agent-id",
-          role: "agent",
-          name: "Debug Agent",
-          email: userEmail,
-          isActive: true,
-          isAvailable: true,
-          activeSessions: 0,
-          waitingSessions: 0,
-          debugMode: true,
-        });
-      }
-
-      return NextResponse.json({ error: "User not found" }, { status: 401 });
-    }
-
-    // Find the agent associated with the user
-    console.log(`Agent/me API: Finding agent for userId ${user.id}`);
-    const agent = await prisma.agent.findUnique({
-      where: { userId: user.id },
-    });
-
-    // If no agent found, return 401
-    if (!agent) {
-      console.error(`Agent/me API: No agent found for user ${user.id}`);
-
-      // If in debug mode, return mock data
-      if (process.env.DEBUG_MODE === "true") {
-        console.log("DEBUG MODE: Returning mock agent data");
-        return NextResponse.json({
-          id: "debug-agent-id",
-          role: user.role || "agent",
-          name: user.name,
-          email: user.email,
-          isActive: true,
-          isAvailable: true,
-          activeSessions: 0,
-          waitingSessions: 0,
-          debugMode: true,
-        });
-      }
-
-      return NextResponse.json({ error: "Not an agent" }, { status: 401 });
-    }
-
-    // Count active chat sessions for this agent
-    let activeSessions = 0;
-    let waitingSessions = 0;
-
+    // Verify the token
+    let decodedToken;
     try {
-      activeSessions = await prisma.chatSession.count({
-        where: {
-          agentId: agent.id,
-          status: "active",
-        },
-      });
-
-      waitingSessions = await prisma.chatSession.count({
-        where: {
-          status: "waiting",
-        },
-      });
-    } catch (error) {
-      console.error("Error counting chat sessions:", error);
-      // Continue with default values of 0
+      decodedToken = jwt.verify(token, JWT_SECRET) as {
+        id: string;
+        email: string;
+        role: string;
+        agentId: string;
+      };
+      console.log("[API] Token verified for user:", decodedToken.email);
+    } catch (jwtError) {
+      console.error("[API] JWT verification failed:", jwtError);
+      return NextResponse.json(
+        { error: "Invalid authentication token" },
+        { status: 401 }
+      );
     }
 
-    // Return the agent data
+    // If we're in debug mode, allow using mock data for testing
+    if (DEBUG_MODE) {
+      console.log("[API] Debug mode enabled, checking for test accounts");
+
+      // Return mock data for test accounts
+      if (
+        decodedToken.email === "agent@example.com" ||
+        decodedToken.email === "admin@example.com"
+      ) {
+        console.log(
+          `[API] Using mock data for test account: ${decodedToken.email}`
+        );
+
+        return NextResponse.json({
+          id: decodedToken.agentId,
+          name:
+            decodedToken.email === "admin@example.com"
+              ? "Admin Test"
+              : "Agent Test",
+          email: decodedToken.email,
+          role: decodedToken.role,
+          isActive: true,
+          isAvailable: true,
+          activeSessions: 0,
+          waitingSessions: 0,
+        });
+      }
+    }
+
+    // Get the user from the database
+    const user = await prisma.user.findUnique({
+      where: { id: decodedToken.id },
+      include: { agent: true },
+    });
+
+    if (!user) {
+      console.error(`[API] User not found for id: ${decodedToken.id}`);
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    if (!user.agent) {
+      console.error(`[API] No agent profile for user: ${user.email}`);
+      return NextResponse.json(
+        { error: "No agent profile found" },
+        { status: 404 }
+      );
+    }
+
+    // Count active chat sessions
+    const activeSessions = await prisma.chatSession.count({
+      where: {
+        agentId: user.agent.id,
+        status: "ACTIVE",
+      },
+    });
+
+    // Count waiting chat sessions
+    const waitingSessions = await prisma.chatSession.count({
+      where: {
+        status: "WAITING",
+      },
+    });
+
+    // Return agent information
     return NextResponse.json({
-      id: agent.id,
-      role: agent.role,
+      id: user.agent.id,
       name: user.name,
       email: user.email,
-      isActive: agent.isActive,
-      isAvailable: agent.isAvailable,
+      role: user.role,
+      isActive: user.agent.isActive,
+      isAvailable: user.agent.isAvailable,
       activeSessions,
       waitingSessions,
     });
-  } catch (dbError: unknown) {
-    console.error("Error in agent/me API route:", dbError);
+  } catch (error: unknown) {
+    console.error("[API] Error in agent/me endpoint:", error);
 
-    // Return a detailed error response
     return NextResponse.json(
       {
-        error: "Failed to retrieve agent data",
-        details: dbError instanceof Error ? dbError.message : String(dbError),
-        debugMode: process.env.DEBUG_MODE === "true",
+        error: "Failed to retrieve agent information",
+        details: DEBUG_MODE
+          ? error instanceof Error
+            ? error.message
+            : String(error)
+          : undefined,
       },
       { status: 500 }
     );
