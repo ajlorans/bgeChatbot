@@ -83,9 +83,6 @@
     }
   ],
   "functions": {
-    "api/socket": {
-      "maxDuration": 3
-    },
     "src/pages/api/socket.ts": {
       "memory": 512,
       "maxDuration": 3
