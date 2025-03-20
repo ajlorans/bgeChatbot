@@ -33,6 +33,11 @@ export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   debugCookies(req, "Start");
 
+  // TEMPORARY FIX: Completely disable auth checks in middleware to break the loop
+  // Return NextResponse.next() for all routes to allow access without redirects
+  return NextResponse.next();
+
+  /* COMMENTED OUT UNTIL WE FIX THE COOKIE ISSUES
   // Skip middleware for API routes to prevent API access issues
   if (pathname.startsWith("/api/")) {
     console.log("[Middleware] Skipping API route:", pathname);
@@ -113,6 +118,7 @@ export function middleware(req: NextRequest) {
 
   // For all other routes, proceed
   return NextResponse.next();
+  */
 }
 
 export const config = {

@@ -34,14 +34,22 @@ export default function AgentLogin() {
         })
       );
 
-      // Set cookie directly in browser
+      // Set cookie directly in browser with domain and secure attributes
+      const isSecure = window.location.protocol === "https:";
+      const domain =
+        window.location.hostname === "localhost"
+          ? ""
+          : window.location.hostname;
+
       document.cookie = `agent_token=${mockToken}; path=/; max-age=${
         8 * 60 * 60
-      }; SameSite=Lax`;
+      }; SameSite=Lax${isSecure ? "; Secure" : ""}${
+        domain ? `; Domain=${domain}` : ""
+      }`;
 
       console.log("Debug bypass activated, redirecting to dashboard");
 
-      // Redirect to dashboard
+      // Use direct location change instead of router for cookie propagation
       window.location.href = "/agent-dashboard";
     } catch (error) {
       console.error("Error during bypass:", error);
@@ -63,6 +71,7 @@ export default function AgentLogin() {
     setError("");
 
     try {
+      console.log("Submitting login form...");
       const response = await fetch("/api/agent/login", {
         method: "POST",
         headers: {
@@ -73,9 +82,11 @@ export default function AgentLogin() {
           password,
           redirectUrl: "/agent-dashboard",
         }),
+        credentials: "include", // Important: include cookies in the request
       });
 
       const data = await response.json();
+      console.log("Login response:", data);
 
       if (!response.ok) {
         setError(data.error || "Login failed");
@@ -83,12 +94,13 @@ export default function AgentLogin() {
         return;
       }
 
-      // Successful login - redirect
-      if (data.redirectTo) {
-        router.push(data.redirectTo);
-      } else {
-        router.push("/agent-dashboard/");
-      }
+      // Successful login - redirect using window.location for better cookie handling
+      console.log("Login successful, redirecting to dashboard");
+      // Wait a moment to ensure cookies are set
+      setTimeout(() => {
+        // Use window.location.href instead of router.push for better cookie handling
+        window.location.href = data.redirectTo || "/agent-dashboard/";
+      }, 500);
     } catch (err) {
       console.error("Login error:", err);
       setError("An error occurred during login. Please try again.");

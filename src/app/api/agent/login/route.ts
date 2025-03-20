@@ -169,16 +169,28 @@ export async function POST(req: NextRequest) {
       secure: process.env.NODE_ENV === "production",
       maxAge: MAX_AGE,
       sameSite: "lax",
+      // Don't set domain to ensure it works on different environments
     });
 
-    console.log(`[API] Login successful for agent: ${email}, token cookie set`);
+    // Debug logging for cookie
+    console.log(`[API] Login successful for agent: ${email}`);
+    console.log(
+      `[API] Setting token cookie: name=${COOKIE_NAME}, httpOnly=true, path=/, secure=${
+        process.env.NODE_ENV === "production"
+      }`
+    );
+    console.log(`[API] Token length: ${token.length}`);
+
     return response;
   } catch (error: unknown) {
     console.error("[API] Login error:", error);
     return NextResponse.json(
       {
         error: "Server error during login",
-        details: error instanceof Error ? error.message : String(error),
+        details:
+          process.env.DEBUG_MODE === "true" && error instanceof Error
+            ? error.message
+            : "An unexpected error occurred",
       },
       { status: 500 }
     );
