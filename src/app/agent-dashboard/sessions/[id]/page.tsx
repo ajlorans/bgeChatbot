@@ -22,14 +22,25 @@ interface Message {
 
 interface ChatSession {
   id: string;
-  status: 'waiting' | 'active' | 'ended' | 'closed';
+  status: "waiting" | "active" | "ended" | "closed";
   customerName: string | null;
   customerEmail: string | null;
-  customerMetadata?: any;
+  customerMetadata?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
   agentId: string | null;
   agentName?: string;
+}
+
+interface MessageData {
+  sessionId?: string;
+  chatSessionId?: string;
+  id: string;
+  content: string;
+  sender: string;
+  role: string;
+  timestamp: string;
+  metadata?: Record<string, unknown>;
 }
 
 export default function ChatSessionPage() {
@@ -52,8 +63,8 @@ export default function ChatSessionPage() {
 
   // Style for debug info - temporary
   const textXxs = {
-    fontSize: '0.6rem',
-    lineHeight: '0.75rem',
+    fontSize: "0.6rem",
+    lineHeight: "0.75rem",
   };
 
   // Fetch chat session details and messages
@@ -118,39 +129,50 @@ export default function ChatSessionPage() {
         );
         if (messagesResponse.ok) {
           const messagesData = await messagesResponse.json();
-          
+
           // Check if we have new messages
           if (messagesData.messages && messagesData.messages.length > 0) {
-            console.log(`Loaded ${messagesData.messages.length} messages from API`);
-            
+            console.log(
+              `Loaded ${messagesData.messages.length} messages from API`
+            );
+
             // Merge the API messages with existing messages, preserving local classifications
-            setMessages(prevMessages => {
+            setMessages((prevMessages) => {
               // Create a map of existing messages by ID
               const existingMessages = new Map();
-              prevMessages.forEach(msg => {
+              prevMessages.forEach((msg) => {
                 existingMessages.set(msg.id, msg);
               });
-              
+
               // Merge new messages, preserving agent/customer flags from existing messages
-              const mergedMessages = messagesData.messages.map((apiMsg: any) => {
-                // If message exists locally and is marked as from agent, preserve that
-                if (existingMessages.has(apiMsg.id) && existingMessages.get(apiMsg.id).isAgent) {
-                  console.log(`Preserving agent status for message ${apiMsg.id}`);
+              const mergedMessages = messagesData.messages.map(
+                (apiMsg: any) => {
+                  // If message exists locally and is marked as from agent, preserve that
+                  if (
+                    existingMessages.has(apiMsg.id) &&
+                    existingMessages.get(apiMsg.id).isAgent
+                  ) {
+                    console.log(
+                      `Preserving agent status for message ${apiMsg.id}`
+                    );
+                    return {
+                      ...apiMsg,
+                      isAgent: true,
+                      sender: "Agent",
+                    };
+                  }
+
+                  // Ensure proper formatting for API messages
                   return {
                     ...apiMsg,
-                    isAgent: true,
-                    sender: "Agent"
+                    isAgent:
+                      apiMsg.role === "agent" || apiMsg.sender === "Agent",
+                    isSystem:
+                      apiMsg.role === "system" || apiMsg.sender === "System",
                   };
                 }
-                
-                // Ensure proper formatting for API messages
-                return {
-                  ...apiMsg,
-                  isAgent: apiMsg.role === 'agent' || apiMsg.sender === 'Agent',
-                  isSystem: apiMsg.role === 'system' || apiMsg.sender === 'System'
-                };
-              });
-              
+              );
+
               return mergedMessages;
             });
           }
@@ -207,7 +229,7 @@ export default function ChatSessionPage() {
                     isAgent: false,
                     isSystem: true,
                     metadata: { chatSessionId: id, endedBy: "customer" },
-                    role: "system"
+                    role: "system",
                   },
                 ];
               });
@@ -220,7 +242,7 @@ export default function ChatSessionPage() {
     }, 5000); // Poll every 5 seconds
 
     // Handle incoming messages from the socket
-    const handleNewMessage = (message: any) => {
+    const handleNewMessage = (message: MessageData) => {
       console.log("⚡ Socket received message:", message);
       console.log("Message role:", message.role);
       console.log("Message isAgent:", message.isAgent);
@@ -261,7 +283,11 @@ export default function ChatSessionPage() {
       let isSystemMessage = false;
       let isAgentMessage = false;
 
-      if (message.isAgent || message.role === "agent" || message.sender === "Agent") {
+      if (
+        message.isAgent ||
+        message.role === "agent" ||
+        message.sender === "Agent"
+      ) {
         sender = "Agent";
         isAgentMessage = true;
       } else if (message.isSystem || message.role === "system") {
@@ -304,7 +330,11 @@ export default function ChatSessionPage() {
         isAgent: isAgentMessage,
         isSystem: isSystemMessage,
         metadata: message.metadata || {},
-        role: isAgentMessage ? "agent" : isSystemMessage ? "system" : "customer"
+        role: isAgentMessage
+          ? "agent"
+          : isSystemMessage
+          ? "system"
+          : "customer",
       };
 
       console.log("📝 Adding formatted message:", formattedMessage);
@@ -318,15 +348,20 @@ export default function ChatSessionPage() {
         const duplicateIdIndex = prev.findIndex((m) => m.id === messageId);
         if (duplicateIdIndex !== -1) {
           console.log("🔄 Skipping duplicate message (same ID)");
-          
+
           // If it's a temp message that's now confirmed, make sure isAgent is correct
-          if (prev[duplicateIdIndex].id.startsWith('temp-') && sender === 'Agent') {
-            console.log("🔄 Replacing temp message with confirmed agent message");
+          if (
+            prev[duplicateIdIndex].id.startsWith("temp-") &&
+            sender === "Agent"
+          ) {
+            console.log(
+              "🔄 Replacing temp message with confirmed agent message"
+            );
             const updatedMessages = [...prev];
             updatedMessages[duplicateIdIndex] = formattedMessage;
             return updatedMessages;
           }
-          
+
           return prev;
         }
 
@@ -416,7 +451,7 @@ export default function ChatSessionPage() {
         isAgent: true,
         isSystem: false,
         metadata: { chatSessionId: id },
-        role: "agent"
+        role: "agent",
       };
 
       // Add the message to local state immediately for better UX
@@ -479,7 +514,7 @@ export default function ChatSessionPage() {
               isAgent: true,
               isSystem: false,
               metadata: data.message.metadata || { chatSessionId: id },
-              role: "agent"
+              role: "agent",
             },
           ];
         });
@@ -629,9 +664,7 @@ export default function ChatSessionPage() {
           {!isSessionEndedByCustomer && session?.status === "active" && (
             <button
               onClick={endSession}
-              disabled={
-                session?.status !== "active"
-              }
+              disabled={session?.status !== "active"}
               className={`px-3 py-1.5 rounded text-white ${
                 session?.status !== "active"
                   ? "bg-gray-400 cursor-not-allowed"
@@ -663,7 +696,9 @@ export default function ChatSessionPage() {
               <div
                 key={`${message.id}-${index}`}
                 className={`flex ${
-                  message.isAgent || message.role === "agent" ? "justify-end" : "justify-start"
+                  message.isAgent || message.role === "agent"
+                    ? "justify-end"
+                    : "justify-start"
                 }`}
               >
                 {message.isSystem || message.role === "system" ? (
@@ -692,12 +727,19 @@ export default function ChatSessionPage() {
                         message.sender || "Customer"
                       )}
                       {/* Debug info - only temporary */}
-                      <span className="text-xxs opacity-70" style={textXxs}> [id: {message.id.substring(0, 4)}... | role: {message.role || 'unset'} | agent: {message.isAgent ? 'true' : 'false'}]</span>
+                      <span className="text-xxs opacity-70" style={textXxs}>
+                        {" "}
+                        [id: {message.id.substring(0, 4)}... | role:{" "}
+                        {message.role || "unset"} | agent:{" "}
+                        {message.isAgent ? "true" : "false"}]
+                      </span>
                     </div>
                     <div>{message.content}</div>
                     <div
                       className={`text-xs mt-1 ${
-                        message.isAgent || message.role === "agent" ? "text-blue-100" : "text-gray-500"
+                        message.isAgent || message.role === "agent"
+                          ? "text-blue-100"
+                          : "text-gray-500"
                       }`}
                     >
                       {formatTimestamp(message.timestamp)}
@@ -732,20 +774,26 @@ export default function ChatSessionPage() {
 
         {/* Customer information panel */}
         <div className="w-64 bg-gray-50 border-l overflow-y-auto p-4 ">
-          <h2 className="font-medium mb-3 text-gray-900">Customer Information</h2>
+          <h2 className="font-medium mb-3 text-gray-900">
+            Customer Information
+          </h2>
 
           <div className="mb-4">
             <h3 className="text-xs uppercase text-gray-500 font-medium">
               Name
             </h3>
-            <p className="text-sm text-gray-900">{session.customerName || "Anonymous"}</p>
+            <p className="text-sm text-gray-900">
+              {session.customerName || "Anonymous"}
+            </p>
           </div>
 
           <div className="mb-4">
             <h3 className="text-xs uppercase text-gray-500 font-medium">
               Email
             </h3>
-            <p className="text-sm text-gray-900">{session.customerEmail || "Not provided"}</p>
+            <p className="text-sm text-gray-900">
+              {session.customerEmail || "Not provided"}
+            </p>
           </div>
 
           <div className="mb-4">

@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSocket } from "@/contexts/SocketContext";
-import { ClockIcon } from "@heroicons/react/24/outline";
 
 interface RecentMessage {
   id: string;
@@ -27,10 +26,13 @@ interface ChatSession {
   recentMessages?: RecentMessage[];
 }
 
-interface ChatMessage {
-  chatSessionId: string;
+interface MessageType {
+  sessionId?: string;
+  chatSessionId?: string;
   content: string;
-  sender: string;
+  id: string;
+  role?: string;
+  sender?: string;
   timestamp: string;
 }
 
@@ -48,7 +50,7 @@ export default function ActiveChatsPage() {
     if (!socket || !isConnected) return;
 
     // Handle incoming messages
-    const handleNewMessage = (message: any) => {
+    const handleNewMessage = (message: MessageType) => {
       console.log("New message received in active chats:", message);
 
       // Get the session ID from either sessionId or chatSessionId (handle both formats)
@@ -138,7 +140,7 @@ export default function ActiveChatsPage() {
           };
           return newSessions;
         } else if (
-          updatedSession.status === "active" && 
+          updatedSession.status === "active" &&
           updatedSession.agentId // Only add if there's an agent assigned
         ) {
           // Add this new session
@@ -381,7 +383,9 @@ export default function ActiveChatsPage() {
                           </div>
                           {/* Mobile-only info */}
                           <div className="sm:hidden mt-1 text-xs text-gray-900">
-                            <div>Last updated: {getTimeElapsed(session.updatedAt)}</div>
+                            <div>
+                              Last updated: {getTimeElapsed(session.updatedAt)}
+                            </div>
                             {session.recentMessages &&
                             session.recentMessages.filter(
                               (msg: RecentMessage) =>
@@ -395,7 +399,9 @@ export default function ActiveChatsPage() {
                                       !msg.isAgent && msg.role !== "agent"
                                   )
                                   .slice(0, 1)
-                                  .map((message: RecentMessage) => message.content)}
+                                  .map(
+                                    (message: RecentMessage) => message.content
+                                  )}
                               </div>
                             ) : null}
                           </div>
