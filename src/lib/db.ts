@@ -94,10 +94,16 @@ const createMockPrismaClient = () => {
       },
     },
     chatSession: {
-      findUnique: async () => null,
       findMany: async () => [],
-      create: async () => ({ id: "mock-session-id" }),
-      update: async () => ({ id: "mock-session-id", updated: true }),
+      findUnique: async () => null,
+      create: async () => ({ id: "mock-session-id", createdAt: new Date() }),
+      update: async () => ({}),
+      upsert: async () => ({}),
+      count: async (query: any) => {
+        console.log("MOCK DB: ChatSession count called with query:", query);
+        // Always return 0 for simplicity
+        return 0;
+      },
     },
     message: {
       findMany: async () => [],
