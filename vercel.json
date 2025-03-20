@@ -1,6 +1,39 @@
 {
-  "buildCommand": "npx prisma generate && NODE_OPTIONS=--max_old_space_size=4096 next build --no-lint",
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
   "installCommand": "npm install",
-  "devCommand": "next dev",
-  "framework": "nextjs"
+  "regions": ["iad1"],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/widget",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/embed.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600"
+        }
+      ]
+    }
+  ],
+  "env": {
+    "PRISMA_SCHEMA_DISABLE_ADVISORY_LOCK": "true"
+  }
 }

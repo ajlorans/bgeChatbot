@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "@/lib/session";
+import { SessionIdParams } from "@/lib/types";
 
 /**
  * Verify if an agent has access to a session
@@ -21,13 +22,10 @@ async function verifyAgentAccess(agentId: string, sessionId: string) {
 /**
  * GET handler to fetch a specific session's details
  */
-export async function GET(
-  req: NextRequest,
-  context: { params: { id: string } }
-) {
+export async function GET(req: NextRequest, { params }: SessionIdParams) {
   try {
-    // Get the session ID from context params
-    const sessionId = context.params.id;
+    // Type-safe access to the session ID
+    const sessionId = params.id;
 
     // Get the authenticated session
     const userSession = await getServerSession();
@@ -97,13 +95,10 @@ export async function GET(
 /**
  * PATCH handler to update a session's status
  */
-export async function PATCH(
-  req: NextRequest,
-  context: { params: { id: string } }
-) {
+export async function PATCH(req: NextRequest, { params }: SessionIdParams) {
   try {
-    // Get the session ID from context params
-    const sessionId = context.params.id;
+    // Type-safe access to the session ID
+    const sessionId = params.id;
 
     const { status } = await req.json();
 
