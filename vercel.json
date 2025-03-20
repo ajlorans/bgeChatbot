@@ -101,12 +101,12 @@
     "NEXT_DISABLE_SOURCEMAPS": "1",
     "NEXT_OUTPUT_STANDALONE": "true",
     "NODE_OPTIONS": "--max-old-space-size=4096",
-    "JWT_SECRET": "@bge_jwt_secret",
+    "JWT_SECRET": "${env.JWT_SECRET}",
     "ALLOW_DEBUG_LOGIN": "true",
     "NODE_ENV": "production",
     "CORS_ALLOW_ALL": "true",
     "DEBUG_MODE": "true",
-    "DATABASE_URL": "@bge_database_url",
+    "DATABASE_URL": "${env.DATABASE_URL}",
     "USE_MOCK_DB": "true"
   }
 }
