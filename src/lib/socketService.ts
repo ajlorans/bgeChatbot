@@ -66,7 +66,12 @@ export interface SocketData {
 }
 
 // JWT verification
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+const JWT_SECRET =
+  process.env.JWT_SECRET ||
+  (process.env.NODE_ENV === "production"
+    ? (console.error("JWT_SECRET is not set in production environment!"),
+      "temporary-fallback-key-for-production")
+    : "development-only-secret-key");
 
 // Initialize with socket.io server
 export const initSocketServer = (
@@ -89,10 +94,10 @@ export const initSocketServer = (
   >(res.socket.server as any, {
     path: "/api/socket",
     addTrailingSlash: false,
-    // Enable CORS for all origins
+    // Enable CORS for all origins during debugging
     cors: {
       origin: "*",
-      methods: ["GET", "POST"],
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
       credentials: true,
     },
   });
