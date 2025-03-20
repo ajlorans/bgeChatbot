@@ -3,6 +3,16 @@ import { prisma } from "@/lib/db";
 import { createAgentSessionToken, UserSession } from "@/lib/session";
 import bcrypt from "bcryptjs";
 
+// Create a URL to redirect to with absolute URL to avoid issues
+function createAgentDashboardURL(req: NextRequest) {
+  // Get the host from the request
+  const host = req.headers.get("host") || "bge-chatbot.vercel.app";
+  const protocol = host.includes("localhost") ? "http://" : "https://";
+
+  // Create an absolute URL to avoid any issues with redirects
+  return `${protocol}${host}/agent-dashboard`;
+}
+
 export async function POST(req: NextRequest) {
   console.log("🔑 Agent login endpoint called");
   console.log("💻 Environment:", {
@@ -141,10 +151,14 @@ export async function POST(req: NextRequest) {
       // Check if this is a form submission (needs redirect) or JSON API call
       if (!req.headers.get("content-type")?.includes("application/json")) {
         console.log("➡️ Redirecting to agent dashboard after successful login");
-        response = NextResponse.redirect(
-          new URL("/agent-dashboard/", req.url),
-          303
-        );
+        // Use absolute URL to redirect
+        const dashboardUrl = createAgentDashboardURL(req);
+        console.log("🔗 Redirecting to:", dashboardUrl);
+
+        response = NextResponse.redirect(dashboardUrl);
+
+        // Add debug header
+        response.headers.set("X-Login-Redirect", "true");
       } else {
         console.log("📤 Returning JSON success response for mock user");
         response = NextResponse.json({
@@ -168,6 +182,13 @@ export async function POST(req: NextRequest) {
         path: "/",
       });
       console.log("🍪 Cookie set in response");
+
+      // Log what we're sending back
+      console.log("📤 Response headers:", {
+        status: response.status,
+        location: response.headers.get("location"),
+        cookies: response.headers.get("set-cookie")?.substring(0, 50) + "...",
+      });
 
       return response;
     }
@@ -253,10 +274,15 @@ export async function POST(req: NextRequest) {
     if (!req.headers.get("content-type")?.includes("application/json")) {
       // For form submissions, redirect to the dashboard
       console.log("➡️ Redirecting to agent dashboard after successful login");
-      response = NextResponse.redirect(
-        new URL("/agent-dashboard/", req.url),
-        303
-      );
+
+      // Use absolute URL to redirect
+      const dashboardUrl = createAgentDashboardURL(req);
+      console.log("🔗 Redirecting to:", dashboardUrl);
+
+      response = NextResponse.redirect(dashboardUrl);
+
+      // Add debug header
+      response.headers.set("X-Login-Redirect", "true");
     } else {
       // For API calls, return JSON response
       console.log("📤 Returning JSON success response");
@@ -281,6 +307,13 @@ export async function POST(req: NextRequest) {
       path: "/",
     });
     console.log("🍪 Cookie set in response");
+
+    // Log what we're sending back
+    console.log("📤 Response headers:", {
+      status: response.status,
+      location: response.headers.get("location"),
+      cookies: response.headers.get("set-cookie")?.substring(0, 50) + "...",
+    });
 
     return response;
   } catch (error: unknown) {
