@@ -23,11 +23,11 @@ async function verifyAgentAccess(agentId: string, sessionId: string) {
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
-    // Get the session ID directly from params
-    const sessionId = params.id;
+    // Get the session ID from context params
+    const sessionId = context.params.id;
 
     // Get the authenticated session
     const userSession = await getServerSession();
@@ -99,11 +99,11 @@ export async function GET(
  */
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
-    // Get the session ID directly from params
-    const sessionId = params.id;
+    // Get the session ID from context params
+    const sessionId = context.params.id;
 
     const { status } = await req.json();
 
