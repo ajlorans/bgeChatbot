@@ -2,14 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "@/lib/session";
 import { io } from "@/lib/socketService";
+import { RouteHandlerParams } from "@/lib/types";
 
-// Properly typed route handler for Next.js App Router
+// Define the type for route parameters
+type RouteParams = { id: string };
+
+/**
+ * Route handler for claiming a session
+ */
 export async function POST(
   request: NextRequest,
-  context: { params: { id: string } }
+  context: RouteHandlerParams<RouteParams>
 ) {
   try {
-    // Get the authenticated session
+    // Get the session ID from the URL parameters
+    const sessionId = context.params.id;
+
+    // Get the authenticated user session
     const session = await getServerSession();
 
     // If no session or not an agent, return unauthorized
@@ -18,7 +27,6 @@ export async function POST(
     }
 
     const agentId = session.user.agentId;
-    const sessionId = context.params.id;
 
     // Log important information for debugging
     console.log(`Agent ${agentId} attempting to claim session ${sessionId}`);

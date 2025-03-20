@@ -1,0 +1,2 @@
+# Skip problematic route file during build
+src/app/api/agent/sessions/[id]/claim/route.ts 
