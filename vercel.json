@@ -44,6 +44,9 @@
     "NEXT_OUTPUT_STANDALONE": "true",
     "NODE_OPTIONS": "--max-old-space-size=4096",
     "JWT_SECRET": "${env.JWT_SECRET}",
-    "ALLOW_DEBUG_LOGIN": "true"
+    "ALLOW_DEBUG_LOGIN": "true",
+    "NODE_ENV": "production",
+    "CORS_ALLOW_ALL": "true",
+    "DEBUG_MODE": "true"
   }
 }

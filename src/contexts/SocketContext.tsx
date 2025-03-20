@@ -54,20 +54,20 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   // Define all callbacks at the component level, not inside useEffect
   const handleMessageReceived = useCallback((message: any) => {
     console.log("Message received:", message);
-    
+
     // Make sure the message has a unique ID
     if (!message.id) {
       message.id = uuidv4();
     }
-    
+
     // Extract agent name from metadata if available
     let agentName = message.agentName;
-    
+
     // Fallback to metadata extraction if agentName not directly on message
-    if (!agentName && message.role === 'agent' && message.metadata) {
+    if (!agentName && message.role === "agent" && message.metadata) {
       try {
         // Handle both string and object metadata
-        if (typeof message.metadata === 'string') {
+        if (typeof message.metadata === "string") {
           const parsedMetadata = JSON.parse(message.metadata);
           agentName = parsedMetadata.agentName;
         } else if (message.metadata.agentName) {
@@ -77,31 +77,31 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         console.error("Error parsing message metadata:", e);
       }
     }
-    
+
     // Create formatted message with agent name
     const formattedMessage = {
       ...message,
       agentName,
       timestamp: message.timestamp || new Date().toISOString(),
     };
-    
+
     // Add to messages
-    setMessages(prevMessages => [...prevMessages, formattedMessage]);
-    
+    setMessages((prevMessages) => [...prevMessages, formattedMessage]);
+
     // Update last message
     setLastMessage(formattedMessage);
   }, []);
 
   const handleNewMessage = useCallback((message: Message) => {
     console.log("New message:", message);
-    
+
     // Ensure we don't have duplicate message IDs by using a different handling path
-    setLastMessage({ 
-      ...message, 
+    setLastMessage({
+      ...message,
       // For typescript compatibility, we need to ensure the property exists
       timestamp: message.timestamp,
       // Only add agentName if it exists in the source message object
-      ...(message.agentName ? { agentName: message.agentName } : {})
+      ...(message.agentName ? { agentName: message.agentName } : {}),
     });
   }, []);
 
@@ -111,13 +111,19 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   }, []);
 
   // Handle typing indicators with proper typing
-  const handleAgentTyping = useCallback((data: { sessionId: string; isTyping: boolean }) => {
-    setAgentTyping(data.isTyping);
-  }, []);
+  const handleAgentTyping = useCallback(
+    (data: { sessionId: string; isTyping: boolean }) => {
+      setAgentTyping(data.isTyping);
+    },
+    []
+  );
 
-  const handleCustomerTyping = useCallback((data: { sessionId: string; isTyping: boolean }) => {
-    setCustomerTyping(data.isTyping);
-  }, []);
+  const handleCustomerTyping = useCallback(
+    (data: { sessionId: string; isTyping: boolean }) => {
+      setCustomerTyping(data.isTyping);
+    },
+    []
+  );
 
   // Socket initialization effect
   useEffect(() => {
@@ -126,21 +132,36 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       path: "/api/socket",
       autoConnect: true,
       reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 2000,
+      timeout: 20000,
+      transports: ["polling", "websocket"],
+      withCredentials: true,
     });
+
+    // Log debug info
+    console.log("Socket initializing with path: /api/socket");
 
     // Set the socket instance to state
     setSocket(socketInstance);
 
     // Socket event handlers
     socketInstance.on("connect", () => {
-      console.log("Socket connected!");
+      console.log("Socket connected with ID:", socketInstance.id);
       setIsConnected(true);
     });
 
-    socketInstance.on("disconnect", () => {
-      console.log("Socket disconnected!");
+    socketInstance.on("connect_error", (error) => {
+      console.error("Socket connection error:", error.message);
+      // Retry connection with polling only if websocket fails
+      if (socketInstance.io.opts.transports?.includes("websocket")) {
+        console.log("Retrying connection with polling transport only");
+        socketInstance.io.opts.transports = ["polling"];
+      }
+    });
+
+    socketInstance.on("disconnect", (reason) => {
+      console.log("Socket disconnected, reason:", reason);
       setIsConnected(false);
     });
 
@@ -212,7 +233,14 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       socket.off("agentTyping", handleAgentTyping);
       socket.off("customerTyping", handleCustomerTyping);
     };
-  }, [socket, handleMessageReceived, handleNewMessage, handleSessionUpdated, handleAgentTyping, handleCustomerTyping]);
+  }, [
+    socket,
+    handleMessageReceived,
+    handleNewMessage,
+    handleSessionUpdated,
+    handleAgentTyping,
+    handleCustomerTyping,
+  ]);
 
   // Provide the socket and related state to the application
   return (
