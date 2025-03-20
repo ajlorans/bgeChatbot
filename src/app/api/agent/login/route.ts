@@ -1,337 +1,162 @@
-import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { createAgentSessionToken, UserSession } from "@/lib/session";
-import bcrypt from "bcryptjs";
+import { NextRequest, NextResponse } from "next/server";
+import { createAgentSessionToken } from "@/lib/session";
 
-// Create a URL to redirect to with absolute URL to avoid issues
-function createAgentDashboardURL(req: NextRequest) {
-  // Get the host from the request
-  const host = req.headers.get("host") || "bge-chatbot.vercel.app";
-  const protocol = host.includes("localhost") ? "http://" : "https://";
-
-  // Create an absolute URL to avoid any issues with redirects
-  return `${protocol}${host}/agent-dashboard`;
+// Create a URL with trailing slash to prevent redirect loops
+function createAgentDashboardURL(baseUrl: string): URL {
+  const url = new URL("/agent-dashboard/", baseUrl);
+  return url;
 }
 
 export async function POST(req: NextRequest) {
-  console.log("🔑 Agent login endpoint called");
-  console.log("💻 Environment:", {
-    NODE_ENV: process.env.NODE_ENV,
-    ALLOW_DEBUG_LOGIN: process.env.ALLOW_DEBUG_LOGIN,
-    DEBUG_MODE: process.env.DEBUG_MODE,
-    JWT_SECRET_FIRST_CHARS: process.env.JWT_SECRET
-      ? process.env.JWT_SECRET.substring(0, 3) + "***"
-      : "undefined",
-  });
-
-  // Add CORS headers for cross-origin access
-  const response = new NextResponse();
-  response.headers.set("Access-Control-Allow-Origin", "*");
-  response.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  response.headers.set(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization"
-  );
-
-  // Handle preflight requests
-  if (req.method === "OPTIONS") {
-    return response;
-  }
-
+  console.log("[API] Agent login request received");
   try {
-    // Handle both JSON and form data requests
-    let email: string, password: string;
+    // Set no-cache headers
+    const headers = new Headers({
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      Pragma: "no-cache",
+      Expires: "0",
+    });
 
-    console.log("📨 Content-Type:", req.headers.get("content-type"));
+    // Parse request body
+    const body = await req.json();
+    const { email, password, bypassLogin } = body;
 
-    if (req.headers.get("content-type")?.includes("application/json")) {
-      // Handle JSON request
-      const body = await req.json();
-      email = body.email;
-      password = body.password;
-      console.log(
-        "📝 Login attempt with JSON body, email:",
-        email?.substring(0, 3) + "***"
-      );
-    } else {
-      // Handle form submission
-      const formData = await req.formData();
-      email = formData.get("email") as string;
-      password = formData.get("password") as string;
-      console.log(
-        "📝 Login attempt with form data, email:",
-        email?.substring(0, 3) + "***"
-      );
-    }
+    // Allow debug login in development
+    if (process.env.ALLOW_DEBUG_LOGIN === "true" && bypassLogin) {
+      console.log("[API] Using bypass login in development mode");
 
-    if (!email || !password) {
-      console.log("⚠️ Missing credentials");
-      return NextResponse.json(
-        { error: "Email and password are required" },
-        { status: 400 }
-      );
-    }
-
-    // Find user by email
-    console.log("🔍 Looking up user in database:", email);
-    const user = await prisma.user
-      .findUnique({
-        where: { email },
-        include: {
-          agent: true,
-        },
-      })
-      .catch((error: Error) => {
-        console.error("❌ Database error when finding user:", error);
-        return null; // Return null to handle the error case
+      // Create a token with admin permissions
+      const adminToken = createAgentSessionToken({
+        id: "admin-bypass",
+        name: "Admin User",
+        role: "admin",
+        agentId: "admin-bypass",
+        email: "admin@example.com",
       });
 
-    console.log(`🔍 Login attempt for email: ${email}, user found: ${!!user}`);
+      // Set the token cookie
+      const response = NextResponse.redirect(
+        createAgentDashboardURL(req.url),
+        303
+      );
 
-    // TEMPORARY DEBUG: If database connection fails but credentials match test data
-    // Make this match more permissive to help with testing
-    const isTestEmail =
-      email === "agent@example.com" ||
-      email === "admin@example.com" ||
-      email.endsWith("@example.com") ||
-      email === "agent@bge.com" ||
-      email === "admin@bge.com" ||
-      email.includes("agent") ||
-      email.includes("admin");
-
-    const debugMode =
-      process.env.ALLOW_DEBUG_LOGIN === "true" ||
-      process.env.NODE_ENV !== "production" ||
-      process.env.DEBUG_MODE === "true";
-
-    const simplePassword =
-      password === "password123" ||
-      password === "bge123" ||
-      password === "password";
-
-    const allowDebugLogin = debugMode && (simplePassword || debugMode);
-
-    console.log(
-      `🧪 Debug login info: { 
-        email: ${email}, 
-        isTestEmail: ${isTestEmail}, 
-        debugMode: ${debugMode}, 
-        simplePassword: ${simplePassword}, 
-        allowDebugLogin: ${allowDebugLogin} 
-      }`
-    );
-
-    // Force debug login for testing
-    if ((isTestEmail && allowDebugLogin) || debugMode) {
-      console.log("🧪 Using debug login override for test account:", email);
-      // Create a mock user for testing purposes
-      const isAdmin = email.includes("admin");
-      const mockUser = {
-        id: isAdmin ? "admin-test-id" : "agent-test-id",
-        email: email,
-        name: isAdmin ? "Admin Test" : "Agent Test",
-        role: isAdmin ? "admin" : "agent",
-        agent: {
-          id: isAdmin ? "admin-agent-id" : "agent-id",
-          isActive: true,
-          role: isAdmin ? "admin" : "agent",
-          isAvailable: true,
-        },
-      };
-
-      // Create session user data
-      const sessionUser: UserSession = {
-        id: mockUser.id,
-        email: mockUser.email,
-        name: mockUser.name,
-        role: mockUser.role,
-        agentId: mockUser.agent.id,
-      };
-
-      console.log("📝 Created mock session for user:", sessionUser);
-
-      // Create JWT token
-      console.log("🔐 Creating JWT token for mock user");
-      const token = createAgentSessionToken(sessionUser);
-      console.log("🔐 Token created successfully, length:", token.length);
-
-      // Create a response with the right status and data
-      let response;
-
-      // Check if this is a form submission (needs redirect) or JSON API call
-      if (!req.headers.get("content-type")?.includes("application/json")) {
-        console.log("➡️ Redirecting to agent dashboard after successful login");
-        // Use absolute URL to redirect
-        const dashboardUrl = createAgentDashboardURL(req);
-        console.log("🔗 Redirecting to:", dashboardUrl);
-
-        response = NextResponse.redirect(dashboardUrl);
-
-        // Add headers to prevent redirect loops
-        response.headers.set("X-Login-Redirect", "true");
-        response.headers.set("Cache-Control", "no-store");
-      } else {
-        console.log("📤 Returning JSON success response for mock user");
-        response = NextResponse.json({
-          success: true,
-          agent: {
-            id: mockUser.agent.id,
-            name: mockUser.name,
-            email: mockUser.email,
-            role: mockUser.role,
-            isAvailable: true,
-          },
-        });
-      }
-
-      // Set cookie in the response
-      response.cookies.set("agent_token", token, {
+      // Set a longer cookie expiry for development
+      response.cookies.set({
+        name: "agent_token",
+        value: adminToken,
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        sameSite: "lax", // Changed from strict to lax for better cross-site compatibility
-        maxAge: 8 * 60 * 60, // 8 hours in seconds
+        maxAge: 60 * 60 * 12, // 12 hours
         path: "/",
-      });
-      console.log("🍪 Cookie set in response");
-
-      // Log what we're sending back
-      console.log("📤 Response headers:", {
-        status: response.status,
-        location: response.headers.get("location"),
-        cookies: response.headers.get("set-cookie")?.substring(0, 50) + "...",
+        sameSite: "lax",
       });
 
+      console.log("[API] Bypass login successful, redirecting to dashboard");
+      for (const header of headers.entries()) {
+        response.headers.set(header[0], header[1]);
+      }
       return response;
     }
 
-    if (!user || !user.password) {
-      console.log("❌ User not found or password not set");
+    if (!email || !password) {
+      console.error("[API] Missing email or password");
       return NextResponse.json(
-        { error: "Invalid email or password" },
-        { status: 401 }
+        { error: "Email and password are required" },
+        { status: 400, headers }
       );
     }
 
-    // Check if user is an agent
-    if (!user.agent) {
-      console.log("❌ User is not an agent");
-      return NextResponse.json(
-        { error: "User is not authorized as an agent" },
-        { status: 403 }
+    try {
+      // Find user by email with agent relationship
+      const user = await prisma.user.findUnique({
+        where: { email },
+        include: { agent: true },
+      });
+
+      if (!user || !user.agent) {
+        console.error(`[API] Agent not found: ${email}`);
+        return NextResponse.json(
+          { error: "Invalid credentials" },
+          { status: 401, headers }
+        );
+      }
+
+      // In a real system, we'd verify the password hash here
+      // For now, check the raw password (DEMO ONLY)
+      const isPasswordValid = password === user.password;
+
+      if (!isPasswordValid) {
+        console.error(`[API] Invalid password for ${email}`);
+        return NextResponse.json(
+          { error: "Invalid credentials" },
+          { status: 401, headers }
+        );
+      }
+
+      // Create session token
+      const token = createAgentSessionToken({
+        id: user.id,
+        name: user.name,
+        role: user.role,
+        agentId: user.agent.id,
+        email: user.email,
+      });
+
+      // Redirect to dashboard with token
+      const response = NextResponse.redirect(
+        createAgentDashboardURL(req.url),
+        303
       );
-    }
 
-    // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.password);
-    console.log(
-      "🔑 Password verification:",
-      isValidPassword ? "success" : "failed"
-    );
+      // Set token in cookie
+      response.cookies.set({
+        name: "agent_token",
+        value: token,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 60 * 60 * 8, // 8 hours
+        path: "/",
+        sameSite: "lax",
+      });
 
-    if (!isValidPassword) {
-      return NextResponse.json(
-        { error: "Invalid email or password" },
-        { status: 401 }
+      console.log(
+        `[API] Login successful for ${email}, redirecting to dashboard`
       );
-    }
-
-    // Check if agent is active
-    if (!user.agent.isActive) {
-      console.log("❌ Agent account is deactivated");
+      for (const header of headers.entries()) {
+        response.headers.set(header[0], header[1]);
+      }
+      return response;
+    } catch (dbError: unknown) {
+      console.error("[API] Database error during login:", dbError);
       return NextResponse.json(
         {
-          error:
-            "Your agent account has been deactivated. Please contact an administrator.",
+          error: "Internal server error during login",
+          details:
+            process.env.DEBUG_MODE === "true"
+              ? {
+                  message:
+                    dbError instanceof Error
+                      ? dbError.message
+                      : String(dbError),
+                }
+              : undefined,
         },
-        { status: 403 }
+        { status: 500, headers }
       );
     }
-
-    // Create session user data
-    const sessionUser: UserSession = {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      agentId: user.agent.id,
-    };
-
-    // Create JWT token using the helper function
-    console.log("🔐 Creating JWT token for user");
-    const token = createAgentSessionToken(sessionUser);
-    console.log("🔐 Token created successfully, length:", token.length);
-
-    // Update agent's last active timestamp
-    try {
-      await prisma.agent.update({
-        where: { id: user.agent.id },
-        data: {
-          lastActive: new Date(),
-        },
-      });
-      console.log("⏱️ Updated agent last active timestamp");
-    } catch (updateError: unknown) {
-      console.error(
-        "⚠️ Failed to update agent last active timestamp:",
-        updateError
-      );
-      // Continue anyway - this is not critical
-    }
-
-    // Create a response with the right status and data
-    let response;
-
-    // Check if this is a form submission (needs redirect) or JSON API call
-    if (!req.headers.get("content-type")?.includes("application/json")) {
-      // For form submissions, redirect to the dashboard
-      console.log("➡️ Redirecting to agent dashboard after successful login");
-
-      // Use absolute URL to redirect
-      const dashboardUrl = createAgentDashboardURL(req);
-      console.log("🔗 Redirecting to:", dashboardUrl);
-
-      response = NextResponse.redirect(dashboardUrl);
-
-      // Add headers to prevent redirect loops
-      response.headers.set("X-Login-Redirect", "true");
-      response.headers.set("Cache-Control", "no-store");
-    } else {
-      // For API calls, return JSON response
-      console.log("📤 Returning JSON success response");
-      response = NextResponse.json({
-        success: true,
-        agent: {
-          id: user.agent.id,
-          name: user.name,
-          email: user.email,
-          role: user.agent.role,
-          isAvailable: user.agent.isAvailable,
-        },
-      });
-    }
-
-    // Set cookie in the response
-    response.cookies.set("agent_token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax", // Changed from strict to lax for better cross-site compatibility
-      maxAge: 8 * 60 * 60, // 8 hours in seconds
-      path: "/",
-    });
-    console.log("🍪 Cookie set in response");
-
-    // Log what we're sending back
-    console.log("📤 Response headers:", {
-      status: response.status,
-      location: response.headers.get("location"),
-      cookies: response.headers.get("set-cookie")?.substring(0, 50) + "...",
-    });
-
-    return response;
   } catch (error: unknown) {
-    console.error("❌ Login error:", error);
+    console.error("[API] Unexpected error in login route:", error);
     return NextResponse.json(
-      { error: "Login failed. Please try again." },
+      {
+        error: "Internal server error",
+        details:
+          process.env.DEBUG_MODE === "true"
+            ? {
+                message: error instanceof Error ? error.message : String(error),
+              }
+            : undefined,
+      },
       { status: 500 }
     );
   }

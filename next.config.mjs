@@ -1,10 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  reactStrictMode: false,
+  swcMinify: true,
+
   env: {
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     SHOPIFY_STORE_URL: process.env.SHOPIFY_STORE_URL,
     SHOPIFY_ACCESS_TOKEN: process.env.SHOPIFY_ACCESS_TOKEN,
     DATABASE_URL: process.env.DATABASE_URL,
+    AGENT_DASHBOARD_URL: process.env.AGENT_DASHBOARD_URL || "/agent-dashboard",
+    DEBUG_MODE: process.env.DEBUG_MODE || "false",
+    ALLOW_DEBUG_LOGIN: process.env.ALLOW_DEBUG_LOGIN || "false",
+    CORS_ALLOW_ALL: process.env.CORS_ALLOW_ALL || "false",
   },
   // Disable TypeScript type checking during build
   typescript: {
@@ -32,6 +39,22 @@ const nextConfig = {
         permanent: true,
       },
     ];
+  },
+  async rewrites() {
+    return [
+      {
+        source: "/agent-login",
+        destination: "/login/agent",
+      },
+    ];
+  },
+  // Added to ensure socket connections work properly
+  webpack: (config) => {
+    config.externals = [
+      ...(config.externals || []),
+      { bufferutil: "bufferutil", "utf-8-validate": "utf-8-validate" },
+    ];
+    return config;
   },
 };
 
