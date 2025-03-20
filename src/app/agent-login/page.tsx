@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 
 export default function AgentLogin() {
   const searchParams = useSearchParams();
@@ -13,6 +14,24 @@ export default function AgentLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [showDevOptions, setShowDevOptions] = useState(false);
+
+  // Check if in development mode
+  useEffect(() => {
+    // Check if we're in development mode
+    const isDev =
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1" ||
+      window.location.hostname.includes("vercel.app");
+
+    setShowDevOptions(isDev);
+
+    // Pre-fill test credentials in development
+    if (isDev) {
+      setEmail("agent@example.com");
+      setPassword("password123");
+    }
+  }, []);
 
   // Only handle logout when the URL has ?logout=true
   useEffect(() => {
@@ -127,6 +146,18 @@ export default function AgentLogin() {
               {loading ? "Signing in..." : "Sign in"}
             </button>
           </div>
+
+          {showDevOptions && (
+            <div className="mt-4 text-center">
+              <p className="text-xs text-gray-500 mb-2">Development options:</p>
+              <Link
+                href="/agent-bypass"
+                className="text-xs text-blue-600 hover:underline"
+              >
+                Bypass login (development only)
+              </Link>
+            </div>
+          )}
 
           <div className="text-sm text-center text-gray-500">
             <p>For agent access, please contact your administrator</p>
