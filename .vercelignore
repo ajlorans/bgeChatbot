@@ -11,3 +11,6 @@ prisma/seed.ts
 # Debugging and test files
 scripts/test-connection.js
 cypress 
+
+# Prevent issues with large static generation
+src/app/agent-dashboard/**/*.tsx 

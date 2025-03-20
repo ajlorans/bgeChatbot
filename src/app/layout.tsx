@@ -6,6 +6,9 @@ import { Metadata } from "next";
 import { Suspense } from "react";
 import Providers from "@/components/Providers";
 
+// Mark as a dynamic layout to prevent static generation issues
+export const dynamic = "force-dynamic";
+
 // Load Inter font
 const inter = Inter({
   subsets: ["latin"],

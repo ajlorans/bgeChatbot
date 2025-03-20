@@ -19,6 +19,14 @@ const nextConfig = {
     serverComponentsExternalPackages: ["prisma", "@prisma/client"],
     staticWorkerRequestDeadline: 60,
   },
+  // Configure static and dynamic page behavior
+  output: "standalone",
+  // Skip static optimization for database-heavy pages
+  unstable_excludeFiles: [
+    "**/src/app/agent-dashboard/**",
+    "**/src/app/agent/sessions/**",
+    "**/src/app/api/**",
+  ],
 };
 
 export default nextConfig;
