@@ -5,7 +5,6 @@ import React, {
   useContext,
   useEffect,
   useState,
-  useRef,
   useCallback,
 } from "react";
 import { io, Socket } from "socket.io-client";
@@ -13,18 +12,29 @@ import type {
   ClientToServerEvents,
   ServerToClientEvents,
 } from "@/lib/socketService";
+import { shouldConnectSocket } from "@/lib/socketService";
 import { v4 as uuidv4 } from "uuid";
 import { Message } from "@/types/chatTypes";
+import { usePathname } from "next/navigation";
 
 interface SocketProviderProps {
   children: React.ReactNode;
+}
+
+interface SessionUpdate {
+  sessionId: string;
+  status?: string;
+  agentId?: string;
+  customerId?: string;
+  updatedAt?: string;
+  [key: string]: string | number | boolean | undefined | null;
 }
 
 interface SocketContextType {
   socket: Socket<ServerToClientEvents, ClientToServerEvents> | null;
   isConnected: boolean;
   lastMessage: Message | null;
-  lastSessionUpdate: any;
+  lastSessionUpdate: SessionUpdate | null;
   agentTyping: boolean;
   customerTyping: boolean;
   joinSession: (sessionId: string) => void;
@@ -40,19 +50,20 @@ const SocketContext = createContext<SocketContextType | undefined>(undefined);
 export const useSocket = () => useContext(SocketContext);
 
 export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
+  const pathname = usePathname() || "";
   const [socket, setSocket] = useState<Socket<
     ServerToClientEvents,
     ClientToServerEvents
   > | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<Message | null>(null);
-  const [lastSessionUpdate, setLastSessionUpdate] = useState<any>(null);
+  const [lastSessionUpdate, setLastSessionUpdate] =
+    useState<SessionUpdate | null>(null);
   const [agentTyping, setAgentTyping] = useState(false);
   const [customerTyping, setCustomerTyping] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
 
   // Define all callbacks at the component level, not inside useEffect
-  const handleMessageReceived = useCallback((message: any) => {
+  const handleMessageReceived = useCallback((message: Message) => {
     console.log("Message received:", message);
 
     // Make sure the message has a unique ID
@@ -70,7 +81,11 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         if (typeof message.metadata === "string") {
           const parsedMetadata = JSON.parse(message.metadata);
           agentName = parsedMetadata.agentName;
-        } else if (message.metadata.agentName) {
+        } else if (
+          typeof message.metadata === "object" &&
+          message.metadata &&
+          "agentName" in message.metadata
+        ) {
           agentName = message.metadata.agentName;
         }
       } catch (e) {
@@ -79,14 +94,11 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     }
 
     // Create formatted message with agent name
-    const formattedMessage = {
+    const formattedMessage: Message = {
       ...message,
       agentName,
       timestamp: message.timestamp || new Date().toISOString(),
     };
-
-    // Add to messages
-    setMessages((prevMessages) => [...prevMessages, formattedMessage]);
 
     // Update last message
     setLastMessage(formattedMessage);
@@ -105,7 +117,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     });
   }, []);
 
-  const handleSessionUpdated = useCallback((session: any) => {
+  const handleSessionUpdated = useCallback((session: SessionUpdate) => {
     console.log("Session updated:", session);
     setLastSessionUpdate(session);
   }, []);
@@ -127,132 +139,77 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
   // Socket initialization effect
   useEffect(() => {
+    // Check if we should connect socket on this page
+    const enableSocket = shouldConnectSocket(pathname);
+
+    if (!enableSocket) {
+      console.log(`[Socket] Skipping socket connection on ${pathname}`);
+      return;
+    }
+
+    console.log(`[Socket] Initializing socket connection on ${pathname}`);
+
     // Initialize socket connection with more aggressive reconnection strategy
     const socketInstance = io({
       path: "/api/socket",
       autoConnect: true,
       reconnection: true,
-      reconnectionAttempts: 20, // Increased from 10
-      reconnectionDelay: 1000, // Decreased from 2000
-      timeout: 10000, // Decreased from 20000
+      reconnectionAttempts: 10,
+      reconnectionDelay: 2000,
+      timeout: 10000,
       transports: ["polling", "websocket"],
       withCredentials: true,
     });
 
     // Log debug info
-    console.log("Socket initializing with path: /api/socket");
+    console.log("[Socket] Initializing with path: /api/socket");
 
     // Set the socket instance to state
     setSocket(socketInstance);
 
     // Socket event handlers
     socketInstance.on("connect", () => {
-      console.log("Socket connected with ID:", socketInstance.id);
+      console.log("[Socket] Connected with ID:", socketInstance.id);
       setIsConnected(true);
     });
 
     socketInstance.on("connect_error", (error) => {
-      console.error("Socket connection error:", error.message);
+      console.error("[Socket] Connection error:", error.message);
 
-      // Fall back to polling transport if websocket is problematic
-      if (
-        error.message.includes("websocket") ||
-        socketInstance.io.opts.transports?.includes("websocket")
-      ) {
-        console.log("Retrying connection with polling transport only");
-        socketInstance.io.opts.transports = ["polling"];
+      // Don't try to reconnect on login pages
+      if (!enableSocket) {
+        console.log("[Socket] Not reconnecting on login/public page");
+        socketInstance.disconnect();
+        return;
       }
-
-      // Add a short delay and then try to reconnect
-      setTimeout(() => {
-        if (!socketInstance.connected) {
-          console.log("Attempting to manually reconnect socket...");
-          socketInstance.connect();
-        }
-      }, 3000);
     });
 
     // Handle disconnections with auto-reconnect strategy
     socketInstance.on("disconnect", (reason) => {
-      console.log("Socket disconnected, reason:", reason);
+      console.log("[Socket] Disconnected, reason:", reason);
       setIsConnected(false);
-
-      // If the disconnection wasn't initiated by the client, try to reconnect
-      if (reason !== "io client disconnect") {
-        // Shorter delay for reconnection attempts
-        setTimeout(() => {
-          console.log("Attempting to reconnect after disconnection...");
-          if (!socketInstance.connected) {
-            socketInstance.connect();
-          }
-        }, 1500);
-      }
-    });
-
-    // Handle explicit errors
-    socketInstance.on("error", (error) => {
-      console.error("Socket error:", error);
-      // Don't kill the connection on errors, just log them
-    });
-
-    socketInstance.on("messageReceived", (message) => {
-      console.log("Socket context received message:", message);
-      setLastMessage(message);
-      // Note: Individual components will handle the message via their own listeners
-    });
-
-    socketInstance.on("newMessage", (message) => {
-      console.log("Socket context received new message broadcast:", message);
-      // This is a backup mechanism to ensure all clients get the message
-      // Set the last message so that components can react to it
-      setLastMessage(message);
-    });
-
-    socketInstance.on("sessionUpdated", (session) => {
-      console.log("Socket context received session update:", session);
-      // Individual components will handle this via their own listeners
-    });
-
-    socketInstance.on("agentTyping", (data) => {
-      console.log("Agent typing:", data);
-    });
-
-    socketInstance.on("customerTyping", (data) => {
-      console.log("Customer typing:", data);
     });
 
     // Cleanup on unmount
     return () => {
-      console.log("Cleaning up socket...");
+      console.log("[Socket] Cleaning up socket connection");
       socketInstance.disconnect();
     };
-  }, []);
+  }, [pathname]);
 
   // Socket event handlers effect
   useEffect(() => {
     if (!socket) return;
 
-    const handleDisconnect = (reason: string) => {
-      console.log("Socket disconnected:", reason);
-      setIsConnected(false);
-    };
-
-    const handleError = (error: unknown) => {
-      console.error("Socket error:", error);
-    };
-
-    // Update the socket event handlers
-    socket.on("disconnect", handleDisconnect);
-    socket.on("error", handleError);
+    // Add event listeners
     socket.on("messageReceived", handleMessageReceived);
     socket.on("newMessage", handleNewMessage);
     socket.on("sessionUpdated", handleSessionUpdated);
     socket.on("agentTyping", handleAgentTyping);
     socket.on("customerTyping", handleCustomerTyping);
 
+    // Cleanup listeners on unmount or socket change
     return () => {
-      socket.off("disconnect", handleDisconnect);
-      socket.off("error", handleError);
       socket.off("messageReceived", handleMessageReceived);
       socket.off("newMessage", handleNewMessage);
       socket.off("sessionUpdated", handleSessionUpdated);
@@ -268,7 +225,46 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     handleCustomerTyping,
   ]);
 
-  // Provide the socket and related state to the application
+  // Define socket event handlers
+  const joinSession = useCallback(
+    (sessionId: string) => {
+      if (socket && isConnected) {
+        console.log(`[Socket] Joining session: ${sessionId}`);
+        socket.emit("joinSession", sessionId);
+      } else {
+        console.warn("[Socket] Cannot join session - socket not connected");
+      }
+    },
+    [socket, isConnected]
+  );
+
+  const leaveSession = useCallback(
+    (sessionId: string) => {
+      if (socket && isConnected) {
+        console.log(`[Socket] Leaving session: ${sessionId}`);
+        socket.emit("leaveSession", sessionId);
+      }
+    },
+    [socket, isConnected]
+  );
+
+  const emitEvent = useCallback(
+    <T extends keyof ClientToServerEvents>(
+      event: T,
+      ...args: Parameters<ClientToServerEvents[T]>
+    ) => {
+      if (socket && isConnected) {
+        console.log(`[Socket] Emitting event: ${String(event)}`, args);
+        socket.emit(event, ...args);
+      } else {
+        console.warn(
+          `[Socket] Cannot emit event ${String(event)} - socket not connected`
+        );
+      }
+    },
+    [socket, isConnected]
+  );
+
   return (
     <SocketContext.Provider
       value={{
@@ -278,9 +274,9 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         lastSessionUpdate,
         agentTyping,
         customerTyping,
-        joinSession: () => {},
-        leaveSession: () => {},
-        emitEvent: () => {},
+        joinSession,
+        leaveSession,
+        emitEvent,
       }}
     >
       {children}

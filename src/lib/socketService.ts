@@ -73,6 +73,38 @@ const JWT_SECRET =
       "temporary-fallback-secret-key")
     : "development-secret-key");
 
+// Flag to prevent socket connections on login/public pages
+export const shouldConnectSocket = (pathname: string): boolean => {
+  // Don't connect on login pages, public pages, or when not in a browser
+  if (typeof window === "undefined") return false;
+
+  // Skip socket initialization on these paths
+  const noSocketPaths = [
+    "/agent-login",
+    "/login",
+    "/login/agent",
+    "/widget",
+    "/embed",
+  ];
+
+  // Check if we're on a path that shouldn't establish socket connections
+  for (const path of noSocketPaths) {
+    if (pathname === path || pathname.startsWith(`${path}/`)) {
+      console.log(`[Socket] Skipping connection on ${pathname}`);
+      return false;
+    }
+  }
+
+  // Skip socket on API routes
+  if (pathname.startsWith("/api/")) {
+    console.log(`[Socket] Skipping connection on API route ${pathname}`);
+    return false;
+  }
+
+  console.log(`[Socket] Should connect socket on ${pathname}`);
+  return true;
+};
+
 // Initialize with socket.io server
 export const initSocketServer = (
   req: NextApiRequest,

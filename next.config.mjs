@@ -43,8 +43,8 @@ const nextConfig = {
   async rewrites() {
     return [
       {
-        source: "/agent-login",
-        destination: "/login/agent",
+        source: "/login/agent",
+        destination: "/agent-login",
       },
     ];
   },
