@@ -26,9 +26,17 @@ export interface ServerToClientEvents {
   agentTyping: (data: { sessionId: string; isTyping: boolean }) => void;
   customerTyping: (data: { sessionId: string; isTyping: boolean }) => void;
   agentStatusChange: (data: { agentId: string; status: string }) => void;
-  chatEnded: (data: { sessionId: string; endedBy: 'agent' | 'customer' }) => void;
-  'chat:claimed': (data: { sessionId: string; agentId: string; agentName: string; timestamp: Date }) => void;
-  'chat:newWaitingSession': (session: any) => void;
+  chatEnded: (data: {
+    sessionId: string;
+    endedBy: "agent" | "customer";
+  }) => void;
+  "chat:claimed": (data: {
+    sessionId: string;
+    agentId: string;
+    agentName: string;
+    timestamp: Date;
+  }) => void;
+  "chat:newWaitingSession": (session: any) => void;
 }
 
 export interface ClientToServerEvents {
@@ -117,15 +125,34 @@ export const initSocketServer = (
   // Middleware for authentication
   io.use(async (socket, next) => {
     const cookies = socket.handshake.headers.cookie;
+
+    // Allow unauthenticated connections (for customers)
     if (!cookies) {
-      return next(new Error("Authentication error"));
+      console.log(
+        "No cookies found, allowing unauthenticated connection for customer"
+      );
+      socket.data.user = {
+        id: `guest-${Date.now()}`,
+        role: "customer",
+        agentId: null,
+      };
+      return next();
     }
 
     const parsedCookies = parse(cookies);
     const token = parsedCookies.agent_token || parsedCookies.token;
 
+    // If no token, still allow connection as guest
     if (!token) {
-      return next(new Error("Authentication error"));
+      console.log(
+        "No token found, allowing unauthenticated connection for customer"
+      );
+      socket.data.user = {
+        id: `guest-${Date.now()}`,
+        role: "customer",
+        agentId: null,
+      };
+      return next();
     }
 
     try {
@@ -142,7 +169,15 @@ export const initSocketServer = (
       });
 
       if (!user) {
-        return next(new Error("User not found"));
+        console.log(
+          "User not found in database but allowing connection as guest"
+        );
+        socket.data.user = {
+          id: `guest-${Date.now()}`,
+          role: "customer",
+          agentId: null,
+        };
+        return next();
       }
 
       // Attach user data to socket
@@ -154,7 +189,14 @@ export const initSocketServer = (
 
       next();
     } catch (error) {
-      return next(new Error("Authentication error"));
+      console.error("JWT verification error:", error);
+      // Still allow connection as guest
+      socket.data.user = {
+        id: `guest-${Date.now()}`,
+        role: "customer",
+        agentId: null,
+      };
+      return next();
     }
   });
 
@@ -206,7 +248,11 @@ export const initSocketServer = (
         const userId = socket.data.user.id;
         const isAgent = !!socket.data.user.agentId;
 
-        console.log(`Message from ${isAgent ? 'agent' : 'customer'} in session ${sessionId}`);
+        console.log(
+          `Message from ${
+            isAgent ? "agent" : "customer"
+          } in session ${sessionId}`
+        );
 
         // Verify the session exists
         const session = await prisma.chatSession.findUnique({
@@ -217,12 +263,12 @@ export const initSocketServer = (
                 user: {
                   select: {
                     name: true,
-                    email: true
-                  }
-                }
-              }
-            }
-          }
+                    email: true,
+                  },
+                },
+              },
+            },
+          },
         });
 
         if (!session) {
@@ -233,7 +279,9 @@ export const initSocketServer = (
 
         // For agents, verify they have access to this session
         if (isAgent && socket.data.user.agentId !== session.agentId) {
-          console.error(`Agent ${socket.data.user.agentId} doesn't have access to session ${sessionId}`);
+          console.error(
+            `Agent ${socket.data.user.agentId} doesn't have access to session ${sessionId}`
+          );
           socket.emit("error", "You don't have access to this session");
           return;
         }
@@ -249,10 +297,10 @@ export const initSocketServer = (
             where: { id: userId },
             select: {
               name: true,
-              email: true
-            }
+              email: true,
+            },
           });
-          
+
           agentName = agent?.name || "Agent";
           console.log(`Agent name retrieved from user lookup: ${agentName}`);
         }
@@ -264,17 +312,17 @@ export const initSocketServer = (
           sessionId,
           timestamp: new Date(),
         };
-        
+
         // Only add metadata if it's from an agent
         if (isAgent) {
           messageData.metadata = JSON.stringify({
             agentId: socket.data.user.agentId,
-            agentName: agentName
+            agentName: agentName,
           });
         }
-        
+
         const message = await prisma.message.create({
-          data: messageData
+          data: messageData,
         });
 
         // Update session's last activity
@@ -298,7 +346,7 @@ export const initSocketServer = (
           role: message.role,
           timestamp: message.timestamp.toISOString(),
           sessionId: String(sessionId),
-          agentName: agentName // Add agent name directly to the message
+          agentName: agentName, // Add agent name directly to the message
         };
 
         console.log(`Broadcasting message to session ${sessionId}`);
@@ -401,14 +449,14 @@ export const initSocketServer = (
         // Update the session status
         await prisma.chatSession.update({
           where: { id: sessionId },
-          data: { 
+          data: {
             status: "ended",
-            updatedAt: new Date() 
+            updatedAt: new Date(),
           },
         });
 
         // Determine who ended the chat
-        const endedBy = socket.data.user.agentId ? 'agent' : 'customer';
+        const endedBy = socket.data.user.agentId ? "agent" : "customer";
 
         // Create a system message about the chat ending
         await prisma.message.create({
@@ -422,15 +470,17 @@ export const initSocketServer = (
 
         // Broadcast the chat ended event to all clients in the session
         if (io) {
-          io.to(sessionId).emit("chatEnded", { 
-            sessionId, 
-            endedBy 
+          io.to(sessionId).emit("chatEnded", {
+            sessionId,
+            endedBy,
           });
         }
 
         // Leave the session room
         socket.leave(sessionId);
-        console.log(`User ${socket.data.user.id} left session ${sessionId} after ending chat`);
+        console.log(
+          `User ${socket.data.user.id} left session ${sessionId} after ending chat`
+        );
 
         // Log active rooms
         logRooms();

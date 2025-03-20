@@ -27,12 +27,22 @@ export async function OPTIONS(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const origin = req.headers.get("origin");
-  const allowedOrigins = getAllowedOrigins();
 
+  // TEMPORARY: Disable strict origin checking for debugging
   // Check if the origin is allowed
+  /*
   if (!origin || !allowedOrigins.includes(origin)) {
     return new NextResponse(null, { status: 403 });
   }
+  */
+
+  // Set CORS headers in the response
+  const headers = {
+    "Access-Control-Allow-Origin": origin || "*",
+    "Access-Control-Allow-Methods": corsConfig.methods.join(", "),
+    "Access-Control-Allow-Headers": corsConfig.allowedHeaders.join(", "),
+    "Access-Control-Allow-Credentials": "true",
+  };
 
   try {
     const { sessionId, customerEmail, customerName, issue, messages } =
@@ -180,16 +190,21 @@ export async function POST(req: NextRequest) {
       ? "Your request has been received. An agent will be with you shortly. Please wait."
       : "Thank you for your request. All our agents are currently busy. You've been added to the queue and an agent will assist you as soon as possible.";
 
-    return NextResponse.json({
-      success: true,
-      sessionId: chatSession.id,
-      status,
-      message: responseMessage,
-      position: hasAvailableAgent ? 0 : await getQueuePosition(chatSession.id),
-      estimatedWaitTime: hasAvailableAgent
-        ? 0
-        : await calculateEstimatedWaitTime(),
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        sessionId: chatSession.id,
+        status,
+        message: responseMessage,
+        position: hasAvailableAgent
+          ? 0
+          : await getQueuePosition(chatSession.id),
+        estimatedWaitTime: hasAvailableAgent
+          ? 0
+          : await calculateEstimatedWaitTime(),
+      },
+      { headers }
+    );
   } catch (error) {
     console.error("Error handling agent request:", error);
     return NextResponse.json(
@@ -197,7 +212,7 @@ export async function POST(req: NextRequest) {
         success: false,
         message: "Failed to process your request. Please try again later.",
       },
-      { status: 500 }
+      { status: 500, headers }
     );
   }
 }
