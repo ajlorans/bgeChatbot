@@ -1,4 +1,4 @@
-export type MessageRole = "user" | "assistant" | "system";
+export type MessageRole = "user" | "assistant" | "system" | "agent";
 
 export interface Message {
   id: string;
@@ -6,6 +6,13 @@ export interface Message {
   content: string;
   timestamp: number;
   category?: ChatCategory;
+  agentName?: string;
+  metadata?: any;
+  receivedAt?: number;
+  isAgent?: boolean;
+  isSystem?: boolean;
+  sender?: string;
+  chatSessionId?: string;
 }
 
 export interface ChatSession {
@@ -13,6 +20,11 @@ export interface ChatSession {
   messages: Message[];
   createdAt: number;
   updatedAt: number;
+  agentId?: string;
+  isLiveChat?: boolean;
+  status?: LiveChatStatus;
+  customerEmail?: string;
+  customerId?: string;
 }
 
 export interface ChatbotSettings {
@@ -33,7 +45,8 @@ export type ChatCategory =
   | "recipes"
   | "product_registration"
   | "merchandise"
-  | "general";
+  | "general"
+  | "live_agent";
 
 export interface ChatRequest {
   messages: Message[];
@@ -43,4 +56,32 @@ export interface ChatRequest {
 export interface ChatResponse {
   messages: Message[];
   category?: ChatCategory;
+}
+
+export type LiveChatStatus =
+  | "requested" // User has requested a live agent
+  | "queued" // User is waiting for an agent
+  | "waiting" // User is waiting for an agent (dashboard terminology)
+  | "active" // User is connected with an agent
+  | "ended" // Chat session has ended
+  | "closed" // Chat session is completed and in history
+  | "abandoned"; // User left before agent connected
+
+export interface LiveChatRequest {
+  sessionId: string;
+  customerEmail?: string;
+  customerName?: string;
+  issue?: string;
+  priority?: "low" | "medium" | "high";
+}
+
+export interface Agent {
+  id: string;
+  name: string;
+  email: string;
+  isActive: boolean;
+  isAvailable: boolean;
+  role: "agent" | "supervisor" | "admin";
+  activeSessions: string[]; // Array of active session IDs
+  lastActive: number;
 }

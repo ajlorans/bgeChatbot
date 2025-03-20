@@ -14,9 +14,16 @@ export async function generateRecipeWithAI(
 ): Promise<string> {
   try {
     const recipePrompt = `Create a detailed recipe for ${dish} cooked on a Big Green Egg ceramic grill/smoker. 
-    Include a title, introduction, complete ingredients list with measurements, step-by-step instructions specifically for cooking on a Big Green Egg, 
-    and tips for success. Focus on techniques specific to the Big Green Egg like temperature control, using the ConvEGGtor for indirect cooking, 
-    and taking advantage of the EGG's unique properties. Format the recipe with markdown headings and bullet points.`;
+    Include the following format:
+    
+    1. Start with a title as a level 1 heading (# Title) that includes the dish name and "Big Green Egg" (e.g., "# Big Green Egg Smoked Brisket")
+    2. Add a brief introduction about the dish and why it's great on the Big Green Egg
+    3. Include a complete ingredients list with precise measurements
+    4. Provide numbered step-by-step instructions clearly labeled as "Instructions:" or "Steps:"
+    5. Include cooking temperatures, times, and Big Green Egg-specific techniques (using the ConvEGGtor, controlling vents, etc.)
+    6. End with a few tips for success
+
+    Format the recipe using markdown with proper headings, bullet points for ingredients, and ensure steps are clearly numbered.`;
 
     const response = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
@@ -51,7 +58,7 @@ export function detectRecipeRequest(message: string): {
   isRecipeRequest: boolean;
   requestedDish: string | null;
 } {
-  const lowerMessage = message.toLowerCase();
+  const lowerMessage = message.toLowerCase().trim();
 
   // Check for recipe-related keywords
   const isRecipeRelated =
@@ -62,6 +69,30 @@ export function detectRecipeRequest(message: string): {
 
   if (!isRecipeRelated) {
     return { isRecipeRequest: false, requestedDish: null };
+  }
+
+  // Direct pattern for "X recipe" format (e.g., "bull testicles recipe")
+  const directRecipePattern = /^(.*?)\s+recipe\s*$/i;
+  const directMatch = lowerMessage.match(directRecipePattern);
+  if (directMatch && directMatch[1] && directMatch[1].trim().length > 0) {
+    return {
+      isRecipeRequest: true,
+      requestedDish: directMatch[1].trim(),
+    };
+  }
+
+  // Simple "I want X recipe" pattern
+  const simpleWantPattern = /i\s+want\s+(?:a\s+|an\s+|the\s+)?(.*?)\s+recipe/i;
+  const simpleWantMatch = lowerMessage.match(simpleWantPattern);
+  if (
+    simpleWantMatch &&
+    simpleWantMatch[1] &&
+    simpleWantMatch[1].trim().length > 0
+  ) {
+    return {
+      isRecipeRequest: true,
+      requestedDish: simpleWantMatch[1].trim(),
+    };
   }
 
   // Check for general recipe requests without a specific dish
@@ -76,7 +107,7 @@ export function detectRecipeRequest(message: string): {
     return { isRecipeRequest: true, requestedDish: null };
   }
 
-  // Extract the requested dish using regex
+  // Extract the requested dish using regex - more complex pattern that comes last
   const recipeRequestPattern =
     /(?:recipe(?:\s+for)?|how\s+to\s+(?:cook|make)|i\s+want\s+(?:to\s+cook|a\s+recipe\s+for)|can\s+you\s+(?:give|show)\s+me\s+(?:a\s+recipe|how\s+to\s+cook)|cooking)\s+([a-z\s]+)/i;
 
@@ -87,6 +118,12 @@ export function detectRecipeRequest(message: string): {
       isRecipeRequest: true,
       requestedDish: recipeMatch[1].trim(),
     };
+  }
+
+  // If we have "recipe" in the message but couldn't extract a dish, return true with null dish
+  // This will trigger the "what would you like to cook" prompt just once
+  if (lowerMessage.includes("recipe")) {
+    return { isRecipeRequest: true, requestedDish: null };
   }
 
   return { isRecipeRequest: false, requestedDish: null };
@@ -104,12 +141,57 @@ export async function handleRecipeRequest(
   message: string,
   messages: Message[]
 ): Promise<{ messages: Message[]; category: string }> {
-  const lowerMessage = message.toLowerCase();
+  const lowerMessage = message.toLowerCase().trim();
+
+  // First, check if this is a direct recipe request using our detectRecipeRequest function
+  const { isRecipeRequest, requestedDish } = detectRecipeRequest(message);
+
+  // If it's a direct request with a specific dish, generate the recipe immediately
+  if (isRecipeRequest && requestedDish) {
+    console.log("Direct recipe request detected for:", requestedDish);
+    const aiGeneratedRecipe = await generateRecipeWithAI(openai, requestedDish);
+    return {
+      messages: [createMessage("assistant", aiGeneratedRecipe)],
+      category: "tips_and_tricks",
+    };
+  }
 
   // Check if this is a response to a previous recipe preference question
   let previousRecipeRequest = null;
   if (messages.length >= 2) {
     const previousMessage = messages[messages.length - 2];
+
+    // Check if the previous message was the recipe prompt
+    if (
+      previousMessage.role === "assistant" &&
+      previousMessage.content &&
+      previousMessage.content.includes(
+        "I'd be happy to provide a recipe for your Big Green Egg"
+      ) &&
+      previousMessage.content.includes(
+        "What specific dish would you like to cook?"
+      )
+    ) {
+      // The user is responding to our recipe prompt with a dish name
+      // Extract the dish directly from their response as it should be the dish name
+      previousRecipeRequest = lowerMessage.trim();
+      console.log(
+        "Received dish name after recipe prompt:",
+        previousRecipeRequest
+      );
+
+      // Generate recipe for the provided dish name
+      const aiGeneratedRecipe = await generateRecipeWithAI(
+        openai,
+        previousRecipeRequest
+      );
+      return {
+        messages: [createMessage("assistant", aiGeneratedRecipe)],
+        category: "tips_and_tricks",
+      };
+    }
+
+    // Original check for preference question
     if (
       previousMessage.role === "assistant" &&
       previousMessage.content &&
@@ -166,43 +248,26 @@ export async function handleRecipeRequest(
   }
 
   // Check for specific recipe requests
-  const { isRecipeRequest, requestedDish } = detectRecipeRequest(message);
+  const { isRecipeRequest: isGeneralRecipeRequest } =
+    detectRecipeRequest(message);
 
-  if (isRecipeRequest) {
-    // If a specific dish was requested, generate a recipe for it
-    if (requestedDish) {
-      console.log("Detected specific recipe request for:", requestedDish);
-
-      // Generate a recipe for the requested dish
-      console.log("Generating AI recipe for:", requestedDish);
-      const aiGeneratedRecipe = await generateRecipeWithAI(
-        openai,
-        requestedDish
-      );
-
-      return {
-        messages: [createMessage("assistant", aiGeneratedRecipe)],
-        category: "tips_and_tricks",
-      };
-    }
+  if (isGeneralRecipeRequest) {
     // If it's a general recipe request without a specific dish, ask for what they want to cook
-    else {
-      const recipePromptMessage =
-        "I'd be happy to provide a recipe for your Big Green Egg! What specific dish would you like to cook? For example:\n\n" +
-        "• Smoked brisket\n\n" +
-        "• Grilled salmon\n\n" +
-        "• Pizza\n\n" +
-        "• Roast chicken\n\n" +
-        "• Pulled pork\n\n" +
-        "• Smoked ribs\n\n" +
-        "• Grilled vegetables\n\n" +
-        "Just let me know what you'd like to make, and I'll provide a detailed recipe specifically for cooking on your Big Green Egg!";
+    const recipePromptMessage =
+      "I'd be happy to provide a recipe for your Big Green Egg! What specific dish would you like to cook? For example:\n\n" +
+      "• Smoked brisket\n\n" +
+      "• Grilled salmon\n\n" +
+      "• Pizza\n\n" +
+      "• Roast chicken\n\n" +
+      "• Pulled pork\n\n" +
+      "• Smoked ribs\n\n" +
+      "• Grilled vegetables\n\n" +
+      "Just let me know what you'd like to make, and I'll provide a detailed recipe specifically for cooking on your Big Green Egg!";
 
-      return {
-        messages: [createMessage("assistant", recipePromptMessage)],
-        category: "tips_and_tricks",
-      };
-    }
+    return {
+      messages: [createMessage("assistant", recipePromptMessage)],
+      category: "tips_and_tricks",
+    };
   }
 
   // General cooking query

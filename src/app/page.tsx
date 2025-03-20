@@ -21,6 +21,19 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Agent Login Button - Top Right Position */}
+      <div className="fixed top-4 right-4 z-40 lg:absolute">
+        <a 
+          href="/agent-login" 
+          className="px-4 py-2 bg-green-700 text-white text-sm rounded-md hover:bg-green-800 transition-colors font-medium flex items-center justify-center space-x-1 shadow-sm"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+          </svg>
+          <span>Agent Login</span>
+        </a>
+      </div>
+
       <div className="relative flex place-items-center">
         <div className="bg-green-700 text-white p-4 rounded-md">
           <a href="https://biggreenegg.com" className="text-xl font-bold">Big Green Egg</a>
