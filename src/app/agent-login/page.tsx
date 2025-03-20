@@ -20,20 +20,32 @@ export default function AgentLogin() {
   const [showDevOptions, setShowDevOptions] = useState(false);
   const [usingFallback, setUsingFallback] = useState(false);
 
-  // Handle direct bypass
+  // Handle direct bypass with a properly formatted bypass token
   const handleBypass = () => {
     try {
+      // Create a simple JWT-like token format that our agent/me endpoint can recognize
+      const mockToken = btoa(
+        JSON.stringify({
+          id: "debug-bypass-id",
+          email: "agent@example.com",
+          role: "agent",
+          agentId: "debug-agent-id",
+          exp: Math.floor(Date.now() / 1000) + 8 * 60 * 60, // 8 hours from now
+        })
+      );
+
       // Set cookie directly in browser
-      document.cookie = `agent_token=BYPASS_TOKEN_${Date.now()}; path=/; max-age=${
+      document.cookie = `agent_token=${mockToken}; path=/; max-age=${
         8 * 60 * 60
       }; SameSite=Lax`;
+
+      console.log("Debug bypass activated, redirecting to dashboard");
 
       // Redirect to dashboard
       window.location.href = "/agent-dashboard";
     } catch (error) {
       console.error("Error during bypass:", error);
-      // Fallback to direct URL
-      window.location.href = "/agent-bypass";
+      setError("Failed to activate debug mode. Try normal login instead.");
     }
   };
 

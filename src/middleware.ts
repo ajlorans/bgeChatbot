@@ -19,6 +19,16 @@ function debugCookies(req: NextRequest, context: string) {
   }
 }
 
+// Check if this request is in a redirect loop
+function isInRedirectLoop(req: NextRequest): boolean {
+  // Check for a redirect_count cookie that we'll set to track redirects
+  const redirectCount = req.cookies.get("redirect_count");
+  const count = redirectCount ? parseInt(redirectCount.value, 10) : 0;
+
+  // If we've redirected more than 2 times, consider it a loop
+  return count >= 2;
+}
+
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   debugCookies(req, "Start");
@@ -43,6 +53,22 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // If in a redirect loop, break it by allowing access
+  if (isInRedirectLoop(req)) {
+    console.log("[Middleware] Breaking redirect loop, allowing access");
+    const response = NextResponse.next();
+
+    // Reset the redirect count cookie
+    response.cookies.set({
+      name: "redirect_count",
+      value: "0",
+      path: "/",
+      maxAge: 60, // 1 minute expiry
+    });
+
+    return response;
+  }
+
   // If trying to access the agent dashboard
   if (pathname.startsWith("/agent-dashboard")) {
     // Check if agent token exists
@@ -51,14 +77,38 @@ export function middleware(req: NextRequest) {
     if (!agentToken) {
       console.log("[Middleware] No agent token found, redirecting to login");
 
+      // Increment the redirect count
+      const redirectCount = req.cookies.get("redirect_count");
+      const count = redirectCount ? parseInt(redirectCount.value, 10) : 0;
+
       // Redirect to login page
       const url = new URL("/agent-login", req.url);
-      return NextResponse.redirect(url);
+      const response = NextResponse.redirect(url);
+
+      // Set a cookie to track redirect count
+      response.cookies.set({
+        name: "redirect_count",
+        value: (count + 1).toString(),
+        path: "/",
+        maxAge: 60, // 1 minute expiry
+      });
+
+      return response;
     }
 
     // Allow access to agent dashboard if token exists
     console.log("[Middleware] Agent token found, allowing access to dashboard");
-    return NextResponse.next();
+    const response = NextResponse.next();
+
+    // Reset the redirect count on successful access
+    response.cookies.set({
+      name: "redirect_count",
+      value: "0",
+      path: "/",
+      maxAge: 60,
+    });
+
+    return response;
   }
 
   // For all other routes, proceed
