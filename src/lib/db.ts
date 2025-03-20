@@ -5,8 +5,11 @@ import bcrypt from "bcryptjs";
 // exhausting your database connection limit.
 // Learn more: https://pris.ly/d/help/next-js-best-practices
 
-// Set Prisma log levels directly
-const globalForPrisma = global as unknown as { prisma: PrismaClient };
+// Define global for PrismaClient - prevents multiple instances during hot reloading
+// See: https://www.prisma.io/docs/guides/other/troubleshooting-orm/help-articles/nextjs-prisma-client-dev-practices
+const globalForPrisma = global as unknown as {
+  prisma: PrismaClient | undefined;
+};
 
 // Mock hashed passwords for test users
 const TEST_PASSWORD_HASH = bcrypt.hashSync("password123", 10);
@@ -45,131 +48,191 @@ const TEST_USERS = [
   },
 ];
 
-// Mock implementation of PrismaClient
-const createMockPrismaClient = () => {
-  console.log("🔄 Creating MOCK PrismaClient for testing");
-
-  return {
-    user: {
-      findUnique: async ({ where }: Record<string, any>) => {
-        console.log("MOCK DB: Finding user with criteria:", where);
-
-        if (where.email) {
-          const user = TEST_USERS.find((u) => u.email === where.email);
-          console.log("MOCK DB: User found?", !!user, where.email);
-          return user || null;
-        }
-
-        if (where.id) {
-          const user = TEST_USERS.find((u) => u.id === where.id);
-          console.log("MOCK DB: User found?", !!user, where.id);
-          return user || null;
-        }
-
-        return null;
-      },
-      create: async () => ({ id: "mock-created-user" }),
-      update: async () => ({ id: "mock-updated-user" }),
-    },
+// Mock users for testing
+const mockUsers = [
+  {
+    id: "agent-test-id",
+    email: "agent@example.com",
+    name: "Agent Test",
+    password: "$2a$10$EYMPUt46Pap.aH8.8CZl8.PZ0ZM2TV0DZfBJQqJv4yvRZLL2WNLDe", // password123
+    role: "agent",
     agent: {
-      findUnique: async ({ where }: Record<string, any>) => {
-        console.log("MOCK DB: Finding agent with criteria:", where);
+      id: "agent-id",
+      userId: "agent-test-id",
+      role: "agent",
+      isActive: true,
+      isAvailable: true,
+      lastActive: new Date(),
+    },
+  },
+  {
+    id: "admin-test-id",
+    email: "admin@example.com",
+    name: "Admin Test",
+    password: "$2a$10$EYMPUt46Pap.aH8.8CZl8.PZ0ZM2TV0DZfBJQqJv4yvRZLL2WNLDe", // password123
+    role: "admin",
+    agent: {
+      id: "admin-agent-id",
+      userId: "admin-test-id",
+      role: "admin",
+      isActive: true,
+      isAvailable: true,
+      lastActive: new Date(),
+    },
+  },
+];
 
-        if (where.id) {
-          const user = TEST_USERS.find((u) => u.agent.id === where.id);
-          return user ? user.agent : null;
-        }
-
-        if (where.userId) {
-          const user = TEST_USERS.find((u) => u.id === where.userId);
-          return user ? user.agent : null;
-        }
-
-        return null;
-      },
-      findMany: async () => TEST_USERS.map((u) => u.agent),
-      update: async ({ where, data }: Record<string, any>) => {
-        console.log("MOCK DB: Updating agent:", where, data);
-        return { id: where.id, ...data };
-      },
-    },
-    chatSession: {
-      findMany: async () => [],
-      findUnique: async () => null,
-      create: async () => ({ id: "mock-session-id", createdAt: new Date() }),
-      update: async () => ({}),
-      upsert: async () => ({}),
-      count: async (query: any) => {
-        console.log("MOCK DB: ChatSession count called with query:", query);
-        // Always return 0 for simplicity
-        return 0;
-      },
-    },
-    message: {
-      findMany: async () => [],
-      create: async () => ({ id: "mock-message-id" }),
-    },
-    session: {
-      findUnique: async () => null,
-      create: async () => ({ id: "mock-session-id" }),
-      update: async () => ({ id: "mock-session-id", updated: true }),
-    },
-    $connect: async () => {
-      console.log("MOCK DB: Connecting to mock database");
-      return Promise.resolve();
-    },
-    $disconnect: async () => {
-      console.log("MOCK DB: Disconnecting from mock database");
-      return Promise.resolve();
-    },
-  } as unknown as PrismaClient;
+// Types for our mock database
+type WhereCondition = {
+  id?: string;
+  email?: string;
+  userId?: string;
+  [key: string]: any;
 };
 
-// Create a real or mock PrismaClient instance
-const getPrismaClient = (): PrismaClient => {
-  const isMockMode =
-    process.env.MOCK_DB === "true" ||
-    process.env.DEBUG_MODE === "true" ||
-    process.env.ALLOW_DEBUG_LOGIN === "true";
+type DataPayload = {
+  data: Record<string, any>;
+  [key: string]: any;
+};
+
+// Create a mock Prisma client for development and testing
+// This helps when the real database is unavailable or for debugging
+class MockPrismaClient {
+  user = {
+    findUnique: async ({ where }: { where: WhereCondition }) => {
+      console.log("MOCK DB: Finding user with criteria:", where);
+      let foundUser = null;
+
+      if (where.id) {
+        foundUser = mockUsers.find((user) => user.id === where.id);
+      } else if (where.email) {
+        foundUser = mockUsers.find((user) => user.email === where.email);
+      }
+
+      console.log("MOCK DB: User found?", !!foundUser, foundUser?.id);
+      return foundUser ? { ...foundUser } : null;
+    },
+    create: async (data: DataPayload) => {
+      console.log("MOCK DB: Creating user:", data);
+      return { id: `mock-${Date.now()}`, ...data.data };
+    },
+  };
+
+  agent = {
+    findUnique: async ({ where }: { where: WhereCondition }) => {
+      console.log("MOCK DB: Finding agent with criteria:", where);
+      const foundUser = mockUsers.find((user) => user.agent.id === where.id);
+      if (foundUser) {
+        console.log("MOCK DB: Agent found:", foundUser.agent.id);
+        return { ...foundUser.agent, user: foundUser };
+      }
+      return null;
+    },
+    update: async ({
+      where,
+      data,
+    }: {
+      where: WhereCondition;
+      data: Record<string, any>;
+    }) => {
+      console.log("MOCK DB: Updating agent:", where, data);
+      const foundUser = mockUsers.find((user) => user.agent.id === where.id);
+      if (foundUser) {
+        Object.assign(foundUser.agent, data);
+        return { ...foundUser.agent };
+      }
+      return null;
+    },
+  };
+
+  chatSession = {
+    count: async ({ where }: { where: WhereCondition }) => {
+      console.log("MOCK DB: Counting chat sessions with criteria:", where);
+      return 0; // Always return 0 for mock
+    },
+    findMany: async () => {
+      console.log("MOCK DB: Finding many chat sessions");
+      return []; // Return empty array
+    },
+    create: async (data: DataPayload) => {
+      console.log("MOCK DB: Creating chat session:", data);
+      return { id: `mock-session-${Date.now()}`, ...data.data };
+    },
+    update: async ({
+      where,
+      data,
+    }: {
+      where: WhereCondition;
+      data: Record<string, any>;
+    }) => {
+      console.log("MOCK DB: Updating chat session:", where, data);
+      return { id: where.id, ...data };
+    },
+  };
+
+  message = {
+    findMany: async () => {
+      console.log("MOCK DB: Finding many messages");
+      return []; // Return empty array
+    },
+    create: async (data: DataPayload) => {
+      console.log("MOCK DB: Creating message:", data);
+      return { id: `mock-msg-${Date.now()}`, ...data.data };
+    },
+  };
+
+  // Add a simulate connection method for testing
+  $connect() {
+    console.log("MOCK DB: Connected to mock database");
+    return Promise.resolve();
+  }
+
+  $disconnect() {
+    console.log("MOCK DB: Disconnected from mock database");
+    return Promise.resolve();
+  }
+}
+
+// Determine whether to use a real or mock Prisma client
+function getPrismaClient() {
+  // Use mock client if specified in environment or if we're in testing/development
+  const useMockDb =
+    process.env.USE_MOCK_DB === "true" ||
+    process.env.NODE_ENV === "test" ||
+    process.env.DEBUG_MODE === "true";
 
   console.log(
-    `DB Client initialization - DEBUG_MODE: ${process.env.DEBUG_MODE}, MOCK_DB: ${process.env.MOCK_DB}`
+    `Database Init: Using ${useMockDb ? "MOCK" : "REAL"} database client`
+  );
+  console.log(
+    `Environment: NODE_ENV=${process.env.NODE_ENV}, USE_MOCK_DB=${process.env.USE_MOCK_DB}, DEBUG_MODE=${process.env.DEBUG_MODE}`
   );
 
-  if (isMockMode) {
+  if (useMockDb) {
     console.log(
-      "🧪 Using MOCK Prisma client due to DEBUG_MODE or MOCK_DB being true"
+      "Creating mock PrismaClient - database operations will be simulated"
     );
-    return createMockPrismaClient();
+    return new MockPrismaClient() as unknown as PrismaClient;
   }
 
   try {
-    console.log("🔌 Creating REAL PrismaClient for production");
-    return new PrismaClient();
-  } catch (error) {
-    console.error(
-      "⚠️ Failed to create real PrismaClient - falling back to mock:",
-      error
+    console.log(
+      "Creating real PrismaClient - will attempt to connect to the database"
     );
-    return createMockPrismaClient();
+    // Use the global instance to avoid multiple connections during hot reloading
+    if (!globalForPrisma.prisma) {
+      globalForPrisma.prisma = new PrismaClient({
+        log: ["error", "warn"],
+      });
+      console.log("✅ PrismaClient initialized for", process.env.NODE_ENV);
+    }
+    return globalForPrisma.prisma;
+  } catch (error) {
+    console.error("❌ Failed to create PrismaClient:", error);
+    console.log("⚠️ Falling back to mock database");
+    return new MockPrismaClient() as unknown as PrismaClient;
   }
-};
-
-// Declare global type to help TypeScript understand the global prisma instance
-declare global {
-  // eslint-disable-next-line no-var
-  var prisma: PrismaClient | undefined;
 }
 
-// Initialize the client with singleton pattern for hot reloading
-const prismaClient = global.prisma || getPrismaClient();
-
-// Save prisma client in global to prevent multiple instances in development
-if (process.env.NODE_ENV !== "production") {
-  global.prisma = prismaClient;
-  console.log("✅ PrismaClient initialized and saved globally");
-} else {
-  console.log("✅ PrismaClient initialized for production");
-}
-
-export const prisma = prismaClient;
+// Create a singleton instance of PrismaClient
+export const prisma = getPrismaClient();
