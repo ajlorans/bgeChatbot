@@ -1,21 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function SimpleLogin() {
-  const router = useRouter();
-  const [email, setEmail] = useState("agent@example.com");
-  const [password, setPassword] = useState("password123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  async function handleLogin(e: FormEvent) {
     e.preventDefault();
     setLoading(true);
-    setError("");
+    setError(null);
 
     try {
+      console.log("Attempting login with:", email);
+
+      // Send login request
       const response = await fetch("/api/agent/login", {
         method: "POST",
         headers: {
@@ -24,100 +27,121 @@ export default function SimpleLogin() {
         body: JSON.stringify({ email, password }),
       });
 
-      if (response.ok) {
-        // Successfully logged in, redirect to dashboard
-        router.push("/agent-dashboard");
-      } else {
-        const data = await response.json();
-        setError(data.error || "Login failed");
+      const data = await response.json();
+
+      // Log the response for debugging
+      console.log("Login response:", response.status, data);
+
+      if (!response.ok) {
+        throw new Error(data.error || "Login failed");
       }
-    } catch (err) {
+
+      if (data.success) {
+        console.log("Login successful, redirecting to dashboard");
+
+        // Use the redirect URL from the response or default to /agent-dashboard/
+        const redirectUrl = data.redirectTo || "/agent-dashboard/";
+
+        // Small delay to allow cookie to be set
+        setTimeout(() => {
+          router.push(redirectUrl);
+        }, 500);
+      } else {
+        throw new Error("Login response didn't indicate success");
+      }
+    } catch (err: unknown) {
       console.error("Login error:", err);
-      setError("Network error. Try using the bypass link below.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to login. Please try again."
+      );
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleBypass = () => {
-    // Set cookie directly in browser
-    document.cookie = `agent_token=BYPASS_TOKEN_${Date.now()}; path=/; max-age=${
-      8 * 60 * 60
-    }; SameSite=Lax`;
+  // Functions to set test account credentials
+  function setAgentAccount() {
+    setEmail("agent@example.com");
+    setPassword("password123");
+  }
 
-    // Redirect to dashboard
-    router.push("/agent-dashboard");
-  };
+  function setAdminAccount() {
+    setEmail("admin@example.com");
+    setPassword("password123");
+  }
 
   return (
-    <div className="flex min-h-screen bg-gray-100 items-center justify-center">
-      <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-md">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-800">Agent Login</h1>
-          <p className="mt-2 text-gray-600">Simple login page</p>
+    <div className="max-w-sm mx-auto p-6 bg-white rounded-lg shadow-md">
+      <h2 className="text-2xl font-bold mb-6 text-center">Agent Login</h2>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded">
+          {error}
+        </div>
+      )}
+
+      <form onSubmit={handleLogin}>
+        <div className="mb-4">
+          <label htmlFor="email" className="block text-gray-700 mb-2">
+            Email
+          </label>
+          <input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full p-2 border border-gray-300 rounded"
+            required
+          />
         </div>
 
-        {error && (
-          <div className="p-3 text-sm text-red-700 bg-red-100 rounded">
-            {error}
-          </div>
-        )}
+        <div className="mb-6">
+          <label htmlFor="password" className="block text-gray-700 mb-2">
+            Password
+          </label>
+          <input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full p-2 border border-gray-300 rounded"
+            required
+          />
+        </div>
 
-        <form onSubmit={handleLogin} className="mt-8 space-y-6">
-          <div className="space-y-4">
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Email
-              </label>
-              <input
-                type="email"
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md"
-                required
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Password
-              </label>
-              <input
-                type="password"
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="block w-full px-3 py-2 mt-1 border border-gray-300 rounded-md"
-                required
-              />
-            </div>
-          </div>
+        <button
+          type="submit"
+          disabled={loading}
+          className={`w-full p-2 text-white rounded ${
+            loading ? "bg-blue-400" : "bg-blue-600 hover:bg-blue-700"
+          }`}
+        >
+          {loading ? "Logging in..." : "Login"}
+        </button>
+      </form>
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full px-4 py-2 text-white bg-green-600 rounded-md hover:bg-green-700"
-            >
-              {loading ? "Signing in..." : "Sign in"}
-            </button>
-          </div>
-        </form>
-
-        <div className="mt-4 text-center">
+      {/* Test accounts section */}
+      <div className="mt-8 pt-4 border-t border-gray-200">
+        <p className="text-sm text-gray-500 mb-2">Test Accounts:</p>
+        <div className="flex space-x-2">
           <button
-            onClick={handleBypass}
-            className="text-blue-600 hover:underline"
+            onClick={setAgentAccount}
+            className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded"
           >
-            Bypass Login (Debug Mode)
+            Use Agent Account
+          </button>
+          <button
+            onClick={setAdminAccount}
+            className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded"
+          >
+            Use Admin Account
           </button>
         </div>
+        <p className="text-xs text-gray-400 mt-2">
+          Both test accounts use password: password123
+        </p>
       </div>
     </div>
   );
