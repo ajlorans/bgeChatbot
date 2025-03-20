@@ -36,6 +36,67 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    console.log(`Login attempt for email: ${email}, user found: ${!!user}`);
+
+    // TEMPORARY DEBUG: If database connection fails but credentials match test data
+    const allowDebugLogin =
+      process.env.ALLOW_DEBUG_LOGIN === "true" &&
+      (email === "agent@example.com" || email === "admin@example.com") &&
+      password === "password123";
+
+    if (!user && allowDebugLogin) {
+      console.log("Using debug login override for test account");
+      // Create a mock user for testing purposes
+      const mockUser = {
+        id: email === "admin@example.com" ? "admin-test-id" : "agent-test-id",
+        email: email,
+        name: email === "admin@example.com" ? "Admin Test" : "Agent Test",
+        role: email === "admin@example.com" ? "admin" : "agent",
+        agent: {
+          id: email === "admin@example.com" ? "admin-agent-id" : "agent-id",
+          isActive: true,
+        },
+      };
+
+      // Create session user data
+      const sessionUser: UserSession = {
+        id: mockUser.id,
+        email: mockUser.email,
+        name: mockUser.name,
+        role: mockUser.role,
+        agentId: mockUser.agent.id,
+      };
+
+      // Create JWT token
+      const token = createAgentSessionToken(sessionUser);
+
+      // Set the token as a cookie
+      const cookieStore = await cookies();
+      cookieStore.set("agent_token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 8 * 60 * 60, // 8 hours in seconds
+        path: "/",
+      });
+
+      // Check if this is a form submission (needs redirect) or JSON API call
+      if (!req.headers.get("content-type")?.includes("application/json")) {
+        return NextResponse.redirect(new URL("/agent-dashboard", req.url));
+      }
+
+      return NextResponse.json({
+        success: true,
+        agent: {
+          id: mockUser.agent.id,
+          name: mockUser.name,
+          email: mockUser.email,
+          role: mockUser.role,
+          isAvailable: true,
+        },
+      });
+    }
+
     if (!user || !user.password) {
       return NextResponse.json(
         { error: "Invalid email or password" },

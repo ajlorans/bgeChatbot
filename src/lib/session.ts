@@ -2,7 +2,12 @@ import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 
 // Define the JWT secret
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+const JWT_SECRET =
+  process.env.JWT_SECRET ||
+  (process.env.NODE_ENV === "production"
+    ? (console.error("JWT_SECRET is not set in production environment!"),
+      "temporary-fallback-key-for-production")
+    : "development-only-secret-key");
 
 // Define session types
 export interface UserSession {

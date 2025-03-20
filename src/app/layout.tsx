@@ -5,6 +5,7 @@ import { UserProvider } from "@/components/UserProvider";
 import { Metadata } from "next";
 import { Suspense } from "react";
 import Providers from "@/components/Providers";
+import { Analytics } from "@vercel/analytics/react";
 
 // Mark as a dynamic layout to prevent static generation issues
 export const dynamic = "force-dynamic";
@@ -35,6 +36,7 @@ export default function RootLayout({
             </ChatbotProvider>
           </UserProvider>
         </Providers>
+        <Analytics />
       </body>
     </html>
   );
