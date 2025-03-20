@@ -1,18 +1,18 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { 
-  ChatBubbleLeftRightIcon, 
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import {
+  ChatBubbleLeftRightIcon,
   ClockIcon,
-  UserIcon, 
+  UserIcon,
   CheckCircleIcon,
   ExclamationCircleIcon,
-  ArrowPathIcon
-} from '@heroicons/react/24/outline';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
-import { formatDistanceToNow } from 'date-fns';
+  ArrowPathIcon,
+} from "@heroicons/react/24/outline";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { formatDistanceToNow } from "date-fns";
 
 interface Agent {
   id: string;
@@ -22,6 +22,14 @@ interface Agent {
   lastActive: string;
 }
 
+interface Message {
+  id: string;
+  content: string;
+  role: string;
+  timestamp: string;
+  isRead?: boolean;
+}
+
 interface ChatSession {
   id: string;
   customerName: string;
@@ -29,7 +37,7 @@ interface ChatSession {
   status: string;
   createdAt: string;
   updatedAt: string;
-  messages: any[];
+  messages: Message[];
   lastMessage?: string;
   agentId?: string;
   agentName?: string;
@@ -42,17 +50,17 @@ const AgentDashboard = () => {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<'waiting' | 'active' | 'closed'>('waiting');
+  const [tab, setTab] = useState<"waiting" | "active" | "closed">("waiting");
 
   const fetchSessions = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/agent/sessions');
-      if (!response.ok) throw new Error('Failed to fetch sessions');
+      const response = await fetch("/api/agent/sessions");
+      if (!response.ok) throw new Error("Failed to fetch sessions");
       const data = await response.json();
       setSessions(data.sessions || []);
     } catch (err) {
-      setError('Error fetching sessions');
+      setError("Error fetching sessions");
       console.error(err);
     } finally {
       setLoading(false);
@@ -61,8 +69,8 @@ const AgentDashboard = () => {
 
   const fetchActiveAgents = async () => {
     try {
-      const response = await fetch('/api/agent/active');
-      if (!response.ok) throw new Error('Failed to fetch active agents');
+      const response = await fetch("/api/agent/active");
+      if (!response.ok) throw new Error("Failed to fetch active agents");
       const data = await response.json();
       setAgents(data.agents || []);
     } catch (err) {
@@ -70,16 +78,15 @@ const AgentDashboard = () => {
     }
   };
 
-  // Add a new function to run the session cleanup
   const runSessionCleanup = async () => {
     try {
-      const response = await fetch('/api/agent/sessions/cleanup', {
-        method: 'GET',
+      const response = await fetch("/api/agent/sessions/cleanup", {
+        method: "GET",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.inactiveClosed > 0 || data.abandonedMarked > 0) {
@@ -87,69 +94,73 @@ const AgentDashboard = () => {
           fetchSessions();
         }
       }
-    } catch (error) {
+    } catch (_error) {
       // Silent fail - this is a background process
+      // Using _error to indicate intentionally unused variable
     }
   };
 
   const manuallyCloseSession = async (sessionId: string) => {
     try {
-      const response = await fetch('/api/agent/sessions/cleanup', {
-        method: 'POST',
+      const response = await fetch("/api/agent/sessions/cleanup", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           sessionId,
-          reason: 'manual_close'
+          reason: "manual_close",
         }),
       });
-      
+
       if (response.ok) {
         // Refresh sessions after manual close
         fetchSessions();
       }
     } catch (error) {
-      console.error('Error closing session:', error);
+      console.error("Error closing session:", error);
     }
   };
 
-  // Fetch data when component mounts
   useEffect(() => {
-    if (status === 'authenticated') {
+    if (status === "authenticated") {
       fetchSessions();
       fetchActiveAgents();
-      
+
       // Run initial cleanup
       runSessionCleanup();
-      
+
       // Set up periodic cleanup (every 5 minutes)
       const cleanupInterval = setInterval(runSessionCleanup, 5 * 60 * 1000);
-      
+
       // Set up polling for sessions (every 30 seconds)
       const sessionInterval = setInterval(() => {
         fetchSessions();
         fetchActiveAgents();
       }, 30 * 1000);
-      
+
       return () => {
         clearInterval(cleanupInterval);
         clearInterval(sessionInterval);
       };
-    } else if (status === 'unauthenticated') {
-      router.push('/login');
+    } else if (status === "unauthenticated") {
+      router.push("/login");
     }
-  }, [status, router]);
+  }, [status, router, runSessionCleanup, fetchSessions, fetchActiveAgents]);
 
   // Filter sessions based on current tab
-  const filteredSessions = sessions.filter(session => {
-    if (tab === 'waiting') return session.status === 'waiting';
-    if (tab === 'active') return session.status === 'active' && session.agentId === session?.user?.agentId;
-    if (tab === 'closed') return ['closed', 'abandoned'].includes(session.status);
+  const filteredSessions = sessions.filter((session) => {
+    if (tab === "waiting") return session.status === "waiting";
+    if (tab === "active") {
+      const currentAgentId = (session as any).user?.agentId || "";
+      return session.status === "active" && session.agentId === currentAgentId;
+    }
+    if (tab === "closed")
+      return ["closed", "abandoned"].includes(session.status);
     return true;
   });
 
-  if (status === 'loading') {
+  if (status === "loading") {
     return <div className="flex justify-center p-8">Loading...</div>;
   }
 
@@ -160,22 +171,34 @@ const AgentDashboard = () => {
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-6">Agent Dashboard</h1>
-      
+
       <div className="mb-8">
         <h2 className="text-xl font-semibold mb-4">Active Agents</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {agents.map(agent => (
-            <div key={agent.id} className="bg-white p-4 rounded-lg shadow border">
+          {agents.map((agent) => (
+            <div
+              key={agent.id}
+              className="bg-white p-4 rounded-lg shadow border"
+            >
               <div className="flex items-center">
                 <UserIcon className="h-8 w-8 text-gray-400 mr-3" />
                 <div>
                   <h3 className="font-medium">{agent.name}</h3>
                   <p className="text-sm text-gray-500">{agent.email}</p>
                   <div className="flex items-center mt-1">
-                    <span className={`w-3 h-3 rounded-full mr-2 ${agent.isActive ? 'bg-green-500' : 'bg-gray-300'}`}></span>
-                    <span className="text-sm">{agent.isActive ? 'Active' : 'Inactive'}</span>
+                    <span
+                      className={`w-3 h-3 rounded-full mr-2 ${
+                        agent.isActive ? "bg-green-500" : "bg-gray-300"
+                      }`}
+                    ></span>
+                    <span className="text-sm">
+                      {agent.isActive ? "Active" : "Inactive"}
+                    </span>
                     <span className="text-xs text-gray-500 ml-2">
-                      {agent.lastActive && `Last seen ${formatDistanceToNow(new Date(agent.lastActive))} ago`}
+                      {agent.lastActive &&
+                        `Last seen ${formatDistanceToNow(
+                          new Date(agent.lastActive)
+                        )} ago`}
                     </span>
                   </div>
                 </div>
@@ -184,62 +207,76 @@ const AgentDashboard = () => {
           ))}
         </div>
       </div>
-      
+
       <div className="mb-6">
         <div className="border-b border-gray-200 mb-4">
           <nav className="flex -mb-px space-x-8">
             <button
-              onClick={() => setTab('waiting')}
+              onClick={() => setTab("waiting")}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                tab === 'waiting'
-                  ? 'border-green-500 text-green-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                tab === "waiting"
+                  ? "border-green-500 text-green-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               }`}
             >
-              Waiting ({sessions.filter(s => s.status === 'waiting').length})
+              Waiting ({sessions.filter((s) => s.status === "waiting").length})
             </button>
             <button
-              onClick={() => setTab('active')}
+              onClick={() => setTab("active")}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                tab === 'active'
-                  ? 'border-green-500 text-green-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                tab === "active"
+                  ? "border-green-500 text-green-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               }`}
             >
-              My Active Chats ({sessions.filter(s => s.status === 'active' && s.agentId === session?.user?.agentId).length})
+              My Active Chats (
+              {
+                sessions.filter(
+                  (s) =>
+                    s.status === "active" &&
+                    s.agentId === session?.user?.agentId
+                ).length
+              }
+              )
             </button>
             <button
-              onClick={() => setTab('closed')}
+              onClick={() => setTab("closed")}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                tab === 'closed'
-                  ? 'border-green-500 text-green-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                tab === "closed"
+                  ? "border-green-500 text-green-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               }`}
             >
-              History ({sessions.filter(s => ['closed', 'abandoned'].includes(s.status)).length})
+              History (
+              {
+                sessions.filter((s) =>
+                  ["closed", "abandoned"].includes(s.status)
+                ).length
+              }
+              )
             </button>
           </nav>
         </div>
 
         <div className="flex justify-between mb-4">
           <h2 className="text-xl font-semibold">
-            {tab === 'waiting' && 'Waiting Sessions'}
-            {tab === 'active' && 'My Active Sessions'}
-            {tab === 'closed' && 'Chat History'}
+            {tab === "waiting" && "Waiting Sessions"}
+            {tab === "active" && "My Active Sessions"}
+            {tab === "closed" && "Chat History"}
           </h2>
-          <button 
+          <button
             onClick={() => {
               fetchSessions();
               fetchActiveAgents();
               runSessionCleanup();
-            }} 
+            }}
             className="flex items-center text-sm text-green-600 hover:text-green-800"
           >
             <ArrowPathIcon className="w-4 h-4 mr-1" />
             Refresh
           </button>
         </div>
-        
+
         {loading ? (
           <div className="flex justify-center py-8">
             <ArrowPathIcon className="w-8 h-8 animate-spin text-green-600" />
@@ -252,12 +289,15 @@ const AgentDashboard = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
-            {filteredSessions.map(session => (
-              <div key={session.id} className="bg-white p-4 rounded-lg shadow border">
+            {filteredSessions.map((session) => (
+              <div
+                key={session.id}
+                className="bg-white p-4 rounded-lg shadow border"
+              >
                 <div className="flex justify-between">
                   <div className="mb-2">
                     <span className="font-medium">
-                      {session.customerName || 'Anonymous Customer'}
+                      {session.customerName || "Anonymous Customer"}
                     </span>
                     {session.customerEmail && (
                       <span className="text-sm text-gray-500 ml-2">
@@ -265,27 +305,27 @@ const AgentDashboard = () => {
                       </span>
                     )}
                   </div>
-                  
+
                   <div className="flex items-center">
-                    {session.status === 'waiting' && (
+                    {session.status === "waiting" && (
                       <span className="flex items-center text-yellow-600 text-sm">
                         <ClockIcon className="w-4 h-4 mr-1" />
                         Waiting
                       </span>
                     )}
-                    {session.status === 'active' && (
+                    {session.status === "active" && (
                       <span className="flex items-center text-green-600 text-sm">
                         <ChatBubbleLeftRightIcon className="w-4 h-4 mr-1" />
                         Active
                       </span>
                     )}
-                    {session.status === 'closed' && (
+                    {session.status === "closed" && (
                       <span className="flex items-center text-gray-600 text-sm">
                         <CheckCircleIcon className="w-4 h-4 mr-1" />
                         Closed
                       </span>
                     )}
-                    {session.status === 'abandoned' && (
+                    {session.status === "abandoned" && (
                       <span className="flex items-center text-red-600 text-sm">
                         <ExclamationCircleIcon className="w-4 h-4 mr-1" />
                         Abandoned
@@ -293,7 +333,7 @@ const AgentDashboard = () => {
                     )}
                   </div>
                 </div>
-                
+
                 <div className="text-sm text-gray-500 mb-3">
                   Started {formatDistanceToNow(new Date(session.createdAt))} ago
                   {session.lastMessage && (
@@ -302,7 +342,7 @@ const AgentDashboard = () => {
                     </p>
                   )}
                 </div>
-                
+
                 <div className="flex justify-between">
                   <div>
                     {session.agentId && session.agentName && (
@@ -311,9 +351,9 @@ const AgentDashboard = () => {
                       </div>
                     )}
                   </div>
-                  
+
                   <div className="flex space-x-2">
-                    {session.status === 'active' && (
+                    {session.status === "active" && (
                       <button
                         onClick={() => manuallyCloseSession(session.id)}
                         className="px-3 py-1 bg-red-50 text-red-600 text-sm rounded hover:bg-red-100"
@@ -321,17 +361,17 @@ const AgentDashboard = () => {
                         Close
                       </button>
                     )}
-                    
-                    {session.status === 'waiting' && (
-                      <Link 
+
+                    {session.status === "waiting" && (
+                      <Link
                         href={`/agent/sessions/${session.id}`}
                         className="px-3 py-1 bg-green-50 text-green-600 text-sm rounded hover:bg-green-100"
                       >
                         Claim
                       </Link>
                     )}
-                    
-                    <Link 
+
+                    <Link
                       href={`/agent/sessions/${session.id}`}
                       className="px-3 py-1 bg-blue-50 text-blue-600 text-sm rounded hover:bg-blue-100"
                     >
@@ -348,4 +388,4 @@ const AgentDashboard = () => {
   );
 };
 
-export default AgentDashboard; 
+export default AgentDashboard;
