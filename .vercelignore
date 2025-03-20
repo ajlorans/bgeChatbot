@@ -1,2 +1,9 @@
 # Skip problematic route file during build
 src/app/api/agent/sessions/[id]/claim/route.ts 
+
+# Ignore Prisma migrations and local development files
+prisma/migrations
+prisma/dev.db
+prisma/*.db
+prisma/*.db-journal
+prisma/seed.ts 
