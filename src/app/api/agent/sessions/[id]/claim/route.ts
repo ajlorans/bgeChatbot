@@ -3,8 +3,9 @@ import { prisma } from "@/lib/db";
 import { getServerSession } from "@/lib/session";
 import { io } from "@/lib/socketService";
 
+// Properly typed route handler for Next.js App Router
 export async function POST(
-  req: NextRequest,
+  request: NextRequest,
   context: { params: { id: string } }
 ) {
   try {
