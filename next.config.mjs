@@ -23,16 +23,13 @@ const nextConfig = {
   output: "standalone",
   // Skip static optimization for database-heavy pages
   unstable_excludeFiles: ["**/src/app/agent/sessions/**", "**/src/app/api/**"],
-  // Set up rewrites to ensure routes work correctly
-  async rewrites() {
+  // Redirect for agent dashboard
+  async redirects() {
     return [
       {
         source: "/agent-dashboard",
-        destination: "/agent-dashboard",
-      },
-      {
-        source: "/agent-dashboard/:path*",
-        destination: "/agent-dashboard/:path*",
+        destination: "/agent-dashboard/",
+        permanent: true,
       },
     ];
   },
