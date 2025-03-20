@@ -7,7 +7,7 @@ export interface Message {
   timestamp: number;
   category?: ChatCategory;
   agentName?: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
   receivedAt?: number;
   isAgent?: boolean;
   isSystem?: boolean;
@@ -89,4 +89,18 @@ export interface Agent {
   role: "agent" | "supervisor" | "admin";
   activeSessions: string[]; // Array of active session IDs
   lastActive: number;
+}
+
+/**
+ * Type definition for route handlers with dynamic parameters
+ */
+export interface RouteParams<T extends Record<string, string>> {
+  params: T;
+}
+
+// For session ID routes specifically
+export interface SessionIdParams {
+  params: {
+    id: string;
+  };
 }

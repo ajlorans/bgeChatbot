@@ -2,17 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "@/lib/session";
 import { io } from "@/lib/socketService";
+import { SessionIdParams } from "@/lib/types";
 
 /**
  * Route handler for claiming a session
  */
-export async function POST(
-  req: NextRequest,
-  context: { params: { id: string } }
-) {
+export async function POST(req: NextRequest, { params }: SessionIdParams) {
   try {
-    // Get the session ID from context params
-    const sessionId = context.params.id;
+    // Type-safe access to the session ID
+    const sessionId = params.id;
 
     // Get the authenticated session
     const session = await getServerSession();
