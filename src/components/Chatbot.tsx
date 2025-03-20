@@ -8,7 +8,6 @@ import {
   UserIcon,
   ClockIcon,
   PhoneIcon,
-  ArrowPathIcon,
 } from "@heroicons/react/24/outline";
 import ReactMarkdown from "react-markdown";
 import { useChatbot } from "@/lib/useChatbot";
@@ -21,6 +20,7 @@ import {
   sanitizeEmail,
 } from "@/lib/sanitizer";
 import { Message } from "@/lib/types";
+import OrderStatusForm from "./OrderStatusForm";
 
 interface ChatbotProps {
   initialMessage?: string;
@@ -28,132 +28,6 @@ interface ChatbotProps {
   botName?: string;
   showChatBubble?: boolean;
 }
-
-// Order Status Form Component
-interface OrderStatusFormProps {
-  onSubmit: (orderNumber: string, email: string) => void;
-  onCancel: () => void;
-  isLoading: boolean;
-  primaryColor: string;
-}
-
-const OrderStatusForm: React.FC<OrderStatusFormProps> = ({
-  onSubmit,
-  onCancel,
-  isLoading,
-  primaryColor,
-}) => {
-  const [orderNumber, setOrderNumber] = useState("");
-  const [email, setEmail] = useState("");
-  const [errors, setErrors] = useState({ orderNumber: "", email: "" });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validate inputs
-    const newErrors = { orderNumber: "", email: "" };
-    let hasError = false;
-
-    if (!orderNumber.trim()) {
-      newErrors.orderNumber = "Order number is required";
-      hasError = true;
-    }
-
-    if (!email.trim()) {
-      newErrors.email = "Email address is required";
-      hasError = true;
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      newErrors.email = "Please enter a valid email address";
-      hasError = true;
-    }
-
-    if (hasError) {
-      setErrors(newErrors);
-      return;
-    }
-
-    onSubmit(orderNumber, email);
-  };
-
-  return (
-    <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm mb-4">
-      <h3 className="text-lg font-semibold mb-3 text-gray-900">
-        Check Order Status
-      </h3>
-      <p className="text-sm text-gray-800 mb-4">
-        Please enter your order number and the email address associated with
-        your order.
-      </p>
-
-      <form onSubmit={handleSubmit}>
-        <div className="mb-3">
-          <label
-            htmlFor="orderNumber"
-            className="block text-sm font-medium text-gray-800 mb-1"
-          >
-            Order Number
-          </label>
-          <input
-            type="text"
-            id="orderNumber"
-            value={orderNumber}
-            onChange={(e) => setOrderNumber(e.target.value)}
-            placeholder="e.g. 123456"
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 text-gray-900 ${
-              errors.orderNumber ? "border-red-500" : "border-gray-300"
-            }`}
-            disabled={isLoading}
-          />
-          {errors.orderNumber && (
-            <p className="mt-1 text-xs text-red-500">{errors.orderNumber}</p>
-          )}
-        </div>
-
-        <div className="mb-4">
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-gray-800 mb-1"
-          >
-            Email Address
-          </label>
-          <input
-            type="email"
-            id="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="your@email.com"
-            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 text-gray-900 ${
-              errors.email ? "border-red-500" : "border-gray-300"
-            }`}
-            disabled={isLoading}
-          />
-          {errors.email && (
-            <p className="mt-1 text-xs text-red-500">{errors.email}</p>
-          )}
-        </div>
-
-        <div className="flex justify-between">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
-            disabled={isLoading}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="px-4 py-2 text-sm text-white rounded-md hover:opacity-90"
-            style={{ backgroundColor: primaryColor }}
-            disabled={isLoading}
-          >
-            {isLoading ? "Checking..." : "Check Status"}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-};
 
 const Chatbot = ({
   initialMessage = "Hi there! I'm your Big Green Egg assistant. How can I help you today?",
@@ -167,7 +41,7 @@ const Chatbot = ({
   const prevMessagesRef = useRef<Message[]>([]);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  
+
   const { isOpen, toggleChat, closeChat } = useChatbotContext();
   const [inputValue, setInputValue] = useState("");
   const [showQuickActions, setShowQuickActions] = useState(true);
@@ -210,7 +84,7 @@ const Chatbot = ({
   // Hide quick actions after first user message
   useEffect(() => {
     const hasUserMessage = messages.some((msg) => msg.role === "user");
-    
+
     if (hasUserMessage && showQuickActions) {
       setShowQuickActions(false);
     }
@@ -223,7 +97,7 @@ const Chatbot = ({
         setShowOrderStatusForm(true);
         return;
       case "product_recommendation":
-        message = "Can you recommend a product for me?";
+        message = "Can you recommend an egg size for me?";
         break;
       case "customer_support":
         message = "I'd like some customer support assistance.";
@@ -233,9 +107,6 @@ const Chatbot = ({
         break;
       case "product_registration":
         message = "I want to know the warranty information";
-        break;
-      case "browse_products":
-        message = "I want to browse your products";
         break;
     }
     await sendMessage(message);
@@ -302,7 +173,7 @@ const Chatbot = ({
     if (liveChatStatus === "ended") {
       return;
     }
-    
+
     // If we already have an email, use it directly
     if (customerEmail && validateEmail(customerEmail)) {
       await requestLiveAgent(customerEmail);
@@ -360,7 +231,9 @@ const Chatbot = ({
         <div className="flex items-center p-2 bg-yellow-50 border-y border-yellow-200">
           <ClockIcon className="w-5 h-5 mr-2 text-yellow-500" />
           <span className="text-sm">
-            <span className="font-medium text-gray-800">Waiting for an agent...</span>
+            <span className="font-medium text-gray-800">
+              Waiting for an agent...
+            </span>
             {queuePosition !== undefined && queuePosition > 0 && (
               <span className="block mt-1 text-gray-800">
                 Position in queue: #{queuePosition}
@@ -381,7 +254,8 @@ const Chatbot = ({
         <div className="flex items-center p-2 bg-green-50 border-y border-green-200">
           <UserIcon className="w-5 h-5 mr-2 text-green-500" />
           <span className="text-sm text-gray-800">
-            Connected with {currentAgentName || liveChatDetails?.agentName || "Agent"}
+            Connected with{" "}
+            {currentAgentName || liveChatDetails?.agentName || "Agent"}
           </span>
           <button
             onClick={endLiveChat}
@@ -462,33 +336,250 @@ const Chatbot = ({
       );
     }
 
-    // If it's a product search result, render with enhanced styling
+    // Enhanced visually appealing template for egg recommendation
+    if (
+      category === "egg_recommendation" ||
+      (content.toLowerCase().includes("recommend") &&
+        content.toLowerCase().includes("egg"))
+    ) {
+      return (
+        <div className="styled-message-card">
+          <div className="styled-message-content">
+            <ReactMarkdown
+              components={{
+                a: ({ ...props }) => (
+                  <a
+                    {...props}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-green-700 underline hover:text-green-900 font-medium"
+                  />
+                ),
+                strong: ({ ...props }) => (
+                  <strong {...props} className="font-bold text-green-800" />
+                ),
+                p: ({ ...props }) => (
+                  <p {...props} className="mb-4 leading-relaxed" />
+                ),
+                ul: ({ ...props }) => (
+                  <ul {...props} className="list-disc pl-5 space-y-2 my-4" />
+                ),
+                li: ({ ...props }) => <li {...props} className="pl-1 mb-2" />,
+              }}
+            >
+              {content}
+            </ReactMarkdown>
+          </div>
+        </div>
+      );
+    }
+
+    // Enhanced visually appealing template for recipes with numbered steps
+    if (
+      category === "recipe" ||
+      content.toLowerCase().includes("recipe") ||
+      content.toLowerCase().includes("cooking")
+    ) {
+      // Process content to ensure recipe steps are numbered
+      let processedContent = content;
+
+      // Extract the recipe title if present
+      let recipeTitle = "";
+      const titleMatch = content.match(/^#\s*(.*?)\s*(?:\n|$)/);
+      if (titleMatch && titleMatch[1]) {
+        recipeTitle = titleMatch[1];
+        // Remove the title from the content as we'll display it separately
+        processedContent = processedContent.replace(titleMatch[0], "");
+      }
+
+      // Check if the content has recipe steps that need to be numbered
+      if (
+        content.includes("Steps:") ||
+        content.includes("Instructions:") ||
+        content.includes("Directions:")
+      ) {
+        // Look for common patterns that indicate recipe steps and convert them to numbered lists
+        const stepPatterns = [
+          /Steps:([\s\S]*?)(?=\n\n|$)/i,
+          /Instructions:([\s\S]*?)(?=\n\n|$)/i,
+          /Directions:([\s\S]*?)(?=\n\n|$)/i,
+          /Method:([\s\S]*?)(?=\n\n|$)/i,
+        ];
+
+        for (const pattern of stepPatterns) {
+          const match = content.match(pattern);
+          if (match && match[1]) {
+            const steps = match[1]
+              .trim()
+              .split("\n")
+              .filter((step) => step.trim());
+            const numberedSteps = steps
+              .map((step, index) => {
+                // Remove any existing bullet point, dash, or number at the start
+                const cleanStep = step.trim().replace(/^[-•*]|^\d+\.\s*/g, "");
+                return `${index + 1}. ${cleanStep}`;
+              })
+              .join("\n");
+
+            processedContent = content.replace(
+              match[0],
+              `${match[0].split(":")[0]}:\n${numberedSteps}`
+            );
+            break;
+          }
+        }
+      }
+
+      return (
+        <div className="styled-message-card">
+          {recipeTitle && <div className="recipe-title">{recipeTitle}</div>}
+          <div className="styled-message-content">
+            <ReactMarkdown
+              components={{
+                a: ({ ...props }) => (
+                  <a
+                    {...props}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-green-700 underline hover:text-green-900 font-medium"
+                  />
+                ),
+                strong: ({ ...props }) => (
+                  <strong {...props} className="font-bold text-green-800" />
+                ),
+                p: ({ ...props }) => (
+                  <p {...props} className="mb-4 leading-relaxed" />
+                ),
+                ul: ({ ...props }) => (
+                  <ul {...props} className="list-disc pl-5 space-y-2 my-4" />
+                ),
+                ol: ({ ...props }) => (
+                  <ol {...props} className="list-decimal pl-5 space-y-2 my-4" />
+                ),
+                li: ({ ...props }) => <li {...props} className="pl-1 mb-2" />,
+                h1: ({ ...props }) => <h1 {...props} className="hidden" />, // Hide h1 as we're showing it in the title
+                h2: ({ ...props }) => (
+                  <h2
+                    {...props}
+                    className="text-lg font-bold text-green-800 mt-6 mb-3"
+                  />
+                ),
+              }}
+            >
+              {processedContent}
+            </ReactMarkdown>
+          </div>
+        </div>
+      );
+    }
+
+    // Enhanced visually appealing template for customer support
+    if (
+      category === "customer_support" ||
+      content.toLowerCase().includes("support") ||
+      content.toLowerCase().includes("help")
+    ) {
+      return (
+        <div className="styled-message-card">
+          <div className="styled-message-content">
+            <ReactMarkdown
+              components={{
+                a: ({ ...props }) => (
+                  <a
+                    {...props}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-green-700 underline hover:text-green-900 font-medium"
+                  />
+                ),
+                strong: ({ ...props }) => (
+                  <strong {...props} className="font-bold text-green-800" />
+                ),
+                p: ({ ...props }) => (
+                  <p {...props} className="mb-4 leading-relaxed" />
+                ),
+                ul: ({ ...props }) => (
+                  <ul {...props} className="list-disc pl-5 space-y-2 my-4" />
+                ),
+                li: ({ ...props }) => <li {...props} className="pl-1 mb-2" />,
+              }}
+            >
+              {content}
+            </ReactMarkdown>
+          </div>
+        </div>
+      );
+    }
+
+    // Enhanced visually appealing template for warranty/registration
+    if (
+      category === "warranty" ||
+      content.toLowerCase().includes("warranty") ||
+      content.toLowerCase().includes("registration")
+    ) {
+      return (
+        <div className="styled-message-card">
+          <div className="styled-message-content">
+            <ReactMarkdown
+              components={{
+                a: ({ ...props }) => (
+                  <a
+                    {...props}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-green-700 underline hover:text-green-900 font-medium"
+                  />
+                ),
+                strong: ({ ...props }) => (
+                  <strong {...props} className="font-bold text-green-800" />
+                ),
+                p: ({ ...props }) => (
+                  <p {...props} className="mb-4 leading-relaxed" />
+                ),
+                ul: ({ ...props }) => (
+                  <ul {...props} className="list-disc pl-5 space-y-2 my-4" />
+                ),
+                li: ({ ...props }) => <li {...props} className="pl-1 mb-2" />,
+              }}
+            >
+              {content}
+            </ReactMarkdown>
+          </div>
+        </div>
+      );
+    }
+
+    // If it's a product search result, render without header icon
     if (category === "product") {
       return (
-        <ReactMarkdown
-          components={{
-            a: ({ ...props }) => (
-              <a
-                {...props}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-green-700 underline hover:text-green-900 font-medium"
-              />
-            ),
-            strong: ({ ...props }) => (
-              <strong {...props} className="font-bold text-green-800" />
-            ),
-            p: ({ ...props }) => (
-              <p {...props} className="mb-4 leading-relaxed" />
-            ),
-            ul: ({ ...props }) => (
-              <ul {...props} className="list-disc pl-5 space-y-2 my-4" />
-            ),
-            li: ({ ...props }) => <li {...props} className="pl-1 mb-2" />,
-          }}
-        >
-          {content}
-        </ReactMarkdown>
+        <div className="styled-message-card">
+          <div className="styled-message-content">
+            <ReactMarkdown
+              components={{
+                a: ({ ...props }) => (
+                  <a
+                    {...props}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-green-700 underline hover:text-green-900 font-medium"
+                  />
+                ),
+                strong: ({ ...props }) => (
+                  <strong {...props} className="font-bold text-green-800" />
+                ),
+                p: ({ ...props }) => (
+                  <p {...props} className="mb-4 leading-relaxed" />
+                ),
+                ul: ({ ...props }) => (
+                  <ul {...props} className="list-disc pl-5 space-y-2 my-4" />
+                ),
+                li: ({ ...props }) => <li {...props} className="pl-1 mb-2" />,
+              }}
+            >
+              {content}
+            </ReactMarkdown>
+          </div>
+        </div>
       );
     }
 
@@ -496,7 +587,7 @@ const Chatbot = ({
     if (content.includes('<div class="order-details">')) {
       return (
         <div
-          className="order-details bg-white p-4 rounded-md shadow-sm border border-gray-200"
+          className="order-details-container max-w-full overflow-hidden"
           dangerouslySetInnerHTML={{ __html: content }}
         />
       );
@@ -562,7 +653,7 @@ const Chatbot = ({
   useEffect(() => {
     // Use the refs defined at the top level of the component
     // Don't create new refs here
-    
+
     // Function to handle changes that won't re-trigger effects
     const handleNewMessages = () => {
       if (messagesEndRef.current) {
@@ -575,7 +666,7 @@ const Chatbot = ({
       prevMessagesRef.current = [...messages];
       handleNewMessages();
     }
-    
+
     // Clean up on unmount
     return () => {
       // Cleanup code...
@@ -607,24 +698,24 @@ const Chatbot = ({
           // Using navigator.sendBeacon for reliable delivery during page unload
           const data = JSON.stringify({
             sessionId: liveChatDetails.sessionId,
-            reason: 'customer_left',
-            endedBy: 'customer'
+            reason: "customer_left",
+            endedBy: "customer",
           });
-          
+
           // Use sendBeacon which works better during page unload than fetch
-          navigator.sendBeacon('/api/chat/live-chat/end', data);
+          navigator.sendBeacon("/api/chat/live-chat/end", data);
         } catch (error) {
           // Can't log during unload, but we tried our best
         }
       }
     };
-    
+
     // Add event listener for beforeunload
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
     // Cleanup the event listener
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, [isLiveChat, liveChatDetails]);
 
@@ -681,6 +772,94 @@ const Chatbot = ({
 
           {/* Messages */}
           <div className="flex-1 p-5 overflow-y-auto bg-gray-50">
+            <style jsx global>{`
+              .styled-message-card {
+                background-color: white;
+                border-radius: 8px;
+                overflow: hidden;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+                border: 1px solid #e2e8f0;
+                margin-bottom: 16px;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                  Roboto, Helvetica, Arial, sans-serif;
+              }
+              .styled-message-header {
+                display: flex;
+                align-items: center;
+                padding: 12px 16px;
+                background-color: #006838;
+                color: white;
+                font-weight: 600;
+                border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+              }
+              .styled-message-header h3 {
+                margin: 0;
+                font-size: 16px;
+              }
+              .styled-message-content {
+                padding: 16px;
+                color: #1a202c;
+              }
+              .recipe-header {
+                background-color: #006838;
+                color: white;
+              }
+              .recipe-title {
+                font-size: 1.5rem;
+                font-weight: bold;
+                text-align: center;
+                color: #006838;
+                padding: 0.75rem 1rem;
+                margin: 0;
+                border-bottom: 2px solid #e5e7eb;
+                background-color: #f3f4f6;
+                border-radius: 0;
+                font-family: "Georgia", serif;
+                line-height: 1.3;
+                text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.1);
+              }
+              .support-header {
+                background-color: #3182ce;
+                color: white;
+              }
+              .warranty-header {
+                background-color: #6b46c1;
+                color: white;
+              }
+              .product-header {
+                background-color: #2b6cb0;
+                color: white;
+              }
+              .styled-message-content p {
+                margin-bottom: 12px;
+              }
+              .styled-message-content a {
+                color: #006838;
+                text-decoration: underline;
+                font-weight: 500;
+              }
+              .styled-message-content a:hover {
+                color: #004d2a;
+              }
+              .styled-message-content strong {
+                color: #2d3748;
+                font-weight: 600;
+              }
+              .styled-message-content ul,
+              .styled-message-content ol {
+                margin: 12px 0;
+                padding-left: 24px;
+              }
+              .styled-message-content li {
+                margin-bottom: 6px;
+              }
+              .styled-message-content ol {
+                list-style-type: decimal;
+              }
+              .styled-message-content ol li {
+                padding-left: 8px;
+              }
+            `}</style>
             {messages
               .reduce<Message[]>(
                 (
@@ -738,7 +917,7 @@ const Chatbot = ({
                       </span>
                     </div>
                   )}
-                  
+
                   {message.role === "assistant" && (
                     <div className="flex flex-col items-center mr-2">
                       <div className="flex items-center justify-center w-8 h-8 text-white bg-green-600 rounded-full">
@@ -755,10 +934,12 @@ const Chatbot = ({
                           />
                         </svg>
                       </div>
-                      <span className="text-xs text-gray-600 mt-1">BGE Assistant</span>
+                      <span className="text-xs text-gray-600 mt-1">
+                        BGE Assistant
+                      </span>
                     </div>
                   )}
-                  
+
                   <div
                     className={`px-4 py-2 rounded-lg max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg ${
                       message.role === "system"
@@ -839,12 +1020,6 @@ const Chatbot = ({
                   >
                     📝 Warranty/Registration
                   </button>
-                  <button
-                    onClick={() => handleQuickAction("browse_products")}
-                    className="p-2 text-sm bg-white border-2 border-green-700 text-green-700 rounded-lg hover:bg-green-50 transition-colors"
-                  >
-                    🛒 Browse Products
-                  </button>
                 </div>
               )}
             {isLoading && (
@@ -874,6 +1049,22 @@ const Chatbot = ({
           {/* Input */}
           {!showOrderStatusForm && (
             <form onSubmit={handleSubmit} className="p-3 border-t">
+              {/* Speak to Agent button above the text input */}
+              {!isLiveChat && liveChatStatus !== "ended" && (
+                <div className="flex justify-center mb-3">
+                  <button
+                    type="button"
+                    onClick={handleRequestLiveAgent}
+                    className="flex items-center px-4 py-2 text-sm text-white rounded-full shadow-sm hover:opacity-90"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    <PhoneIcon className="w-4 h-4 mr-1.5" />
+                    Speak to BGE Agent
+                  </button>
+                </div>
+              )}
+
+              {/* Text input and send button taking full width */}
               <div className="flex items-end">
                 <textarea
                   ref={inputRef}
@@ -885,27 +1076,6 @@ const Chatbot = ({
                   style={{ maxHeight: "100px", minHeight: "40px" }}
                   rows={1}
                 />
-                <div className="flex items-center mt-2 space-x-2">
-                  {!isLiveChat && liveChatStatus !== "ended" && (
-                    <button
-                      type="button"
-                      onClick={handleRequestLiveAgent}
-                      className="flex items-center px-3 py-1.5 text-sm text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
-                    >
-                      <PhoneIcon className="w-4 h-4 mr-1" />
-                      Speak to Agent
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={resetChat}
-                    className="flex items-center px-3 py-1.5 text-sm text-gray-600 bg-gray-100 rounded hover:bg-gray-200"
-                    aria-label="reset chat"
-                  >
-                    <ArrowPathIcon className="w-4 h-4 mr-1" />
-                    Reset
-                  </button>
-                </div>
                 <button
                   type="submit"
                   disabled={isLoading || !inputValue.trim()}

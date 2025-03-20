@@ -21,7 +21,32 @@ A Next.js-based AI chatbot for Big Green Egg, featuring order tracking, product 
 - 📱 Responsive design
 - 🧪 Comprehensive unit tests
 
-## Recent Updates (multi-agent-enhancements branch)
+## Recent Updates (tested-3-19-multi-agent-ready branch)
+
+### Shopify Integration Ready
+
+- **Shopify Compatible**: The chatbot is now designed to be embedded directly into Shopify storefronts
+- **Standalone Widget Support**: Created framework for embedding chatbot across different sites
+- **Cross-Domain Communication**: Enhanced API routes with CORS support for cross-domain embedding
+- **Enhanced UI**: Improved recipe display with better styling and title formatting
+- **Optimized Message Styling**: Cleaner message templates without redundant headers
+- **Fixed Recipe Detection**: Improved recipe detection to properly identify specific recipe requests
+
+### Enhanced Agent Dashboard
+
+- **Multi-Agent Support**: Fully tested support for multiple agents handling customer inquiries
+- **Agent Workload Distribution**: System for distributing incoming chat requests among available agents
+- **Chat Transfer Capabilities**: Ability to transfer chats between agents when needed
+- **Comprehensive Analytics**: Track agent performance, response times, and customer satisfaction
+- **Improved API Error Handling**: Better error reporting and handling for agent dashboard operations
+
+### Bug Fixes & Improvements
+
+- **Fixed Recipe Step Formatting**: Eliminated duplicate numbering in recipe instructions
+- **Enhanced Product Recognition**: Improved detection of accessory inquiries
+- **Fixed Message Header Display**: Removed incorrect recipe headers from different message types
+- **Improved Accessory Information**: Enhanced accessory details and fixed broken links
+- **Fixed Recipe Recognition**: Improved detection of specific recipe requests for immediate handling
 
 ### Multi-Agent System Improvements
 

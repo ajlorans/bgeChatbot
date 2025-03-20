@@ -216,7 +216,15 @@ export const products: Record<string, Product> = {
     price: "$14.99",
     url: "https://biggreenegg.com/collections/charcoal-wood-starters/products/apple-smoking-chips-2-9-l-180-cu-in",
     category: "smoking",
-    compatibleWith: ["2XL", "XL", "Large", "Medium", "Small", "MiniMax", "Mini"],
+    compatibleWith: [
+      "2XL",
+      "XL",
+      "Large",
+      "Medium",
+      "Small",
+      "MiniMax",
+      "Mini",
+    ],
     relatedProducts: ["WHISKEY-CHIPS", "HICKORY-CHIPS"],
   },
   "HICKORY-CHIPS": {
@@ -226,7 +234,15 @@ export const products: Record<string, Product> = {
     price: "$14.99",
     url: "https://biggreenegg.com/collections/charcoal-wood-starters/products/hickory-smoking-chips-2-9-l-180-cu-in",
     category: "smoking",
-    compatibleWith: ["2XL", "XL", "Large", "Medium", "Small", "MiniMax", "Mini"],
+    compatibleWith: [
+      "2XL",
+      "XL",
+      "Large",
+      "Medium",
+      "Small",
+      "MiniMax",
+      "Mini",
+    ],
     relatedProducts: ["WHISKEY-CHIPS", "APPLE-CHIPS"],
   },
   "BRISKET-KNIFE": {
@@ -448,9 +464,9 @@ export const products: Record<string, Product> = {
     relatedProducts: [],
   },
   "COOKING-ISLAND-COVER-LARGE": {
-    name: "Cover D - Fits 49\" Cooking Island for XL and L",
+    name: 'Cover D - Fits 49" Cooking Island for XL and L',
     description:
-      "Weather-resistant cover specifically designed to protect your Large EGG with 49\" Cooking Island.",
+      'Weather-resistant cover specifically designed to protect your Large EGG with 49" Cooking Island.',
     price: "$82.99",
     url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-d-fits-49-cooking-island-for-xl-and-l",
     category: "covers",
@@ -458,9 +474,9 @@ export const products: Record<string, Product> = {
     relatedProducts: [],
   },
   "COOKING-ISLAND-COVER-XL": {
-    name: "Cover D - Fits 49\" Cooking Island for XL and L",
+    name: 'Cover D - Fits 49" Cooking Island for XL and L',
     description:
-      "Weather-resistant cover specifically designed to protect your XL EGG with 49\" Cooking Island.",
+      'Weather-resistant cover specifically designed to protect your XL EGG with 49" Cooking Island.',
     price: "$82.99",
     url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-d-fits-49-cooking-island-for-xl-and-l",
     category: "covers",
@@ -468,9 +484,9 @@ export const products: Record<string, Product> = {
     relatedProducts: [],
   },
   "MODERN-TABLE-COVER-LARGE-53": {
-    name: "Cover K - L and XL for 53\" Modern Table",
+    name: 'Cover K - L and XL for 53" Modern Table',
     description:
-      "Weather-resistant cover specifically designed to protect your Large EGG with 53\" Modern Table.",
+      'Weather-resistant cover specifically designed to protect your Large EGG with 53" Modern Table.',
     price: "$99.99",
     url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-k-l-and-xl-for-53-modern-table",
     category: "covers",
@@ -478,9 +494,9 @@ export const products: Record<string, Product> = {
     relatedProducts: [],
   },
   "MODERN-TABLE-COVER-XL-53": {
-    name: "Cover K - L and XL for 53\" Modern Table",
+    name: 'Cover K - L and XL for 53" Modern Table',
     description:
-      "Weather-resistant cover specifically designed to protect your XL EGG with 53\" Modern Table.",
+      'Weather-resistant cover specifically designed to protect your XL EGG with 53" Modern Table.',
     price: "$99.99",
     url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-k-l-and-xl-for-53-modern-table",
     category: "covers",
@@ -488,9 +504,9 @@ export const products: Record<string, Product> = {
     relatedProducts: [],
   },
   "MODERN-TABLE-COVER-LARGE-72": {
-    name: "Cover L - L and XL for 72\" Modern Table",
+    name: 'Cover L - L and XL for 72" Modern Table',
     description:
-      "Weather-resistant cover specifically designed to protect your Large EGG with 72\" Modern Table.",
+      'Weather-resistant cover specifically designed to protect your Large EGG with 72" Modern Table.',
     price: "$109.99",
     url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-l-l-and-xl-for-72-modern-table",
     category: "covers",
@@ -498,9 +514,9 @@ export const products: Record<string, Product> = {
     relatedProducts: [],
   },
   "MODERN-TABLE-COVER-XL-72": {
-    name: "Cover L - L and XL for 72\" Modern Table",
+    name: 'Cover L - L and XL for 72" Modern Table',
     description:
-      "Weather-resistant cover specifically designed to protect your XL EGG with 72\" Modern Table.",
+      'Weather-resistant cover specifically designed to protect your XL EGG with 72" Modern Table.',
     price: "$109.99",
     url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-l-l-and-xl-for-72-modern-table",
     category: "covers",
@@ -508,9 +524,9 @@ export const products: Record<string, Product> = {
     relatedProducts: [],
   },
   "COOKING-ISLAND-COVER-LARGE-76": {
-    name: "Cover J - Fits 76\" Cooking Island for XL and L",
+    name: 'Cover J - Fits 76" Cooking Island for XL and L',
     description:
-      "Weather-resistant cover specifically designed to protect your Large EGG with 76\" Cooking Island.",
+      'Weather-resistant cover specifically designed to protect your Large EGG with 76" Cooking Island.',
     price: "$109.99",
     url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-j-fits-76-cooking-island-for-xl-and-l",
     category: "covers",
@@ -518,9 +534,9 @@ export const products: Record<string, Product> = {
     relatedProducts: [],
   },
   "COOKING-ISLAND-COVER-XL-76": {
-    name: "Cover J - Fits 76\" Cooking Island for XL and L",
+    name: 'Cover J - Fits 76" Cooking Island for XL and L',
     description:
-      "Weather-resistant cover specifically designed to protect your XL EGG with 76\" Cooking Island.",
+      'Weather-resistant cover specifically designed to protect your XL EGG with 76" Cooking Island.',
     price: "$109.99",
     url: "https://biggreenegg.com/collections/covers-cleaning/products/cover-j-fits-76-cooking-island-for-xl-and-l",
     category: "covers",
@@ -625,39 +641,60 @@ export function getProductRecommendations(query: string): Product[] {
   // Special case for direct cover queries
   if (lowerQuery.includes("cover")) {
     // Special case for table covers
-    if ((lowerQuery.includes("large") && lowerQuery.includes("acacia")) || 
-        (lowerQuery.includes("large") && lowerQuery.includes("table"))) {
+    if (
+      (lowerQuery.includes("large") && lowerQuery.includes("acacia")) ||
+      (lowerQuery.includes("large") && lowerQuery.includes("table"))
+    ) {
       recommendations.push(products["TABLE-COVER-LARGE"]);
       return recommendations;
     }
-    
+
     // Special case for nest/stand covers
-    if (lowerQuery.includes("large") && (lowerQuery.includes("nest") || lowerQuery.includes("stand"))) {
+    if (
+      lowerQuery.includes("large") &&
+      (lowerQuery.includes("nest") || lowerQuery.includes("stand"))
+    ) {
       recommendations.push(products["NEST-COVER-LARGE"]);
       return recommendations;
     }
-    if (lowerQuery.includes("xl") && (lowerQuery.includes("nest") || lowerQuery.includes("stand"))) {
+    if (
+      lowerQuery.includes("xl") &&
+      (lowerQuery.includes("nest") || lowerQuery.includes("stand"))
+    ) {
       recommendations.push(products["NEST-COVER-XL"]);
       return recommendations;
     }
-    if (lowerQuery.includes("2xl") && (lowerQuery.includes("nest") || lowerQuery.includes("stand"))) {
+    if (
+      lowerQuery.includes("2xl") &&
+      (lowerQuery.includes("nest") || lowerQuery.includes("stand"))
+    ) {
       recommendations.push(products["NEST-COVER-2XL"]);
       return recommendations;
     }
-    if (lowerQuery.includes("medium") && (lowerQuery.includes("nest") || lowerQuery.includes("stand"))) {
+    if (
+      lowerQuery.includes("medium") &&
+      (lowerQuery.includes("nest") || lowerQuery.includes("stand"))
+    ) {
       recommendations.push(products["NEST-COVER-MEDIUM"]);
       return recommendations;
     }
-    if (lowerQuery.includes("small") && (lowerQuery.includes("nest") || lowerQuery.includes("stand"))) {
+    if (
+      lowerQuery.includes("small") &&
+      (lowerQuery.includes("nest") || lowerQuery.includes("stand"))
+    ) {
       recommendations.push(products["NEST-COVER-SMALL"]);
       return recommendations;
     }
-    if ((lowerQuery.includes("mini") || lowerQuery.includes("minimax")) && 
-        (lowerQuery.includes("nest") || lowerQuery.includes("stand") || lowerQuery.includes("carrier"))) {
+    if (
+      (lowerQuery.includes("mini") || lowerQuery.includes("minimax")) &&
+      (lowerQuery.includes("nest") ||
+        lowerQuery.includes("stand") ||
+        lowerQuery.includes("carrier"))
+    ) {
       recommendations.push(products["NEST-COVER-MINI"]);
       return recommendations;
     }
-    
+
     // Special case for modular covers
     if (lowerQuery.includes("modular") && lowerQuery.includes("expansion")) {
       if (lowerQuery.includes("xl")) {
@@ -671,7 +708,7 @@ export function getProductRecommendations(query: string): Product[] {
         return recommendations;
       }
     }
-    
+
     if (lowerQuery.includes("modular")) {
       if (lowerQuery.includes("2xl")) {
         recommendations.push(products["MODULAR-COVER-2XL"]);
@@ -684,7 +721,7 @@ export function getProductRecommendations(query: string): Product[] {
         return recommendations;
       }
     }
-    
+
     // Special case for modern table covers
     if (lowerQuery.includes("modern") && lowerQuery.includes("53")) {
       if (lowerQuery.includes("xl")) {
@@ -695,7 +732,7 @@ export function getProductRecommendations(query: string): Product[] {
         return recommendations;
       }
     }
-    
+
     if (lowerQuery.includes("modern") && lowerQuery.includes("72")) {
       if (lowerQuery.includes("xl")) {
         recommendations.push(products["MODERN-TABLE-COVER-XL-72"]);
@@ -705,9 +742,13 @@ export function getProductRecommendations(query: string): Product[] {
         return recommendations;
       }
     }
-    
+
     // Special case for cooking island covers
-    if (lowerQuery.includes("cooking") && lowerQuery.includes("island") && lowerQuery.includes("49")) {
+    if (
+      lowerQuery.includes("cooking") &&
+      lowerQuery.includes("island") &&
+      lowerQuery.includes("49")
+    ) {
       if (lowerQuery.includes("xl")) {
         recommendations.push(products["COOKING-ISLAND-COVER-XL"]);
         return recommendations;
@@ -716,8 +757,12 @@ export function getProductRecommendations(query: string): Product[] {
         return recommendations;
       }
     }
-    
-    if (lowerQuery.includes("cooking") && lowerQuery.includes("island") && lowerQuery.includes("76")) {
+
+    if (
+      lowerQuery.includes("cooking") &&
+      lowerQuery.includes("island") &&
+      lowerQuery.includes("76")
+    ) {
       if (lowerQuery.includes("xl")) {
         recommendations.push(products["COOKING-ISLAND-COVER-XL-76"]);
         return recommendations;
@@ -726,12 +771,19 @@ export function getProductRecommendations(query: string): Product[] {
         return recommendations;
       }
     }
-    
+
     // General cover request with size
-    if (lowerQuery.includes("2xl") || lowerQuery.includes("xxl") || lowerQuery.includes("2x")) {
+    if (
+      lowerQuery.includes("2xl") ||
+      lowerQuery.includes("xxl") ||
+      lowerQuery.includes("2x")
+    ) {
       recommendations.push(products["EGG-COVER-2XL"]);
       return recommendations;
-    } else if (lowerQuery.includes("xl") || lowerQuery.includes("extra large")) {
+    } else if (
+      lowerQuery.includes("xl") ||
+      lowerQuery.includes("extra large")
+    ) {
       recommendations.push(products["EGG-COVER-XL"]);
       return recommendations;
     } else if (lowerQuery.includes("large")) {
@@ -743,19 +795,27 @@ export function getProductRecommendations(query: string): Product[] {
     } else if (lowerQuery.includes("small")) {
       recommendations.push(products["EGG-COVER-SMALL"]);
       return recommendations;
-    } else if (lowerQuery.includes("minimax") || lowerQuery.includes("mini max") || lowerQuery.includes("mini")) {
+    } else if (
+      lowerQuery.includes("minimax") ||
+      lowerQuery.includes("mini max") ||
+      lowerQuery.includes("mini")
+    ) {
       recommendations.push(products["EGG-COVER-MINI"]);
       return recommendations;
     }
-    
+
     // Cover request with no size specified - default to all options or a message
-    if (lowerQuery === "cover" || 
-        lowerQuery === "i need a cover" || 
-        lowerQuery === "can you give me a cover" ||
-        lowerQuery.includes("need cover") ||
-        lowerQuery.includes("want cover") ||
-        (lowerQuery.includes("cover") && 
-         (lowerQuery.includes("egg") || lowerQuery.includes("bge") || lowerQuery.includes("big green egg")))) {
+    if (
+      lowerQuery === "cover" ||
+      lowerQuery === "i need a cover" ||
+      lowerQuery === "can you give me a cover" ||
+      lowerQuery.includes("need cover") ||
+      lowerQuery.includes("want cover") ||
+      (lowerQuery.includes("cover") &&
+        (lowerQuery.includes("egg") ||
+          lowerQuery.includes("bge") ||
+          lowerQuery.includes("big green egg")))
+    ) {
       // Depends on context - in this case, let's provide the 2XL cover as default from example
       recommendations.push(products["EGG-COVER-2XL"]);
       return recommendations;
@@ -763,17 +823,22 @@ export function getProductRecommendations(query: string): Product[] {
   }
 
   // Check for cover requests specifically
-  if (lowerQuery.includes("cover") && 
-      (lowerQuery.includes("egg") || 
-       lowerQuery.includes("bge") || 
-       lowerQuery.includes("big green egg") ||
-       lowerQuery === "cover" ||
-       lowerQuery === "i need a cover" ||
-       lowerQuery === "can you give me a cover")) {
-    
+  if (
+    lowerQuery.includes("cover") &&
+    (lowerQuery.includes("egg") ||
+      lowerQuery.includes("bge") ||
+      lowerQuery.includes("big green egg") ||
+      lowerQuery === "cover" ||
+      lowerQuery === "i need a cover" ||
+      lowerQuery === "can you give me a cover")
+  ) {
     // Try to determine size
     let mappedSize = "";
-    if (lowerQuery.includes("minimax") || lowerQuery.includes("mini max") || lowerQuery.includes("mini-max")) {
+    if (
+      lowerQuery.includes("minimax") ||
+      lowerQuery.includes("mini max") ||
+      lowerQuery.includes("mini-max")
+    ) {
       mappedSize = "MINI";
     } else if (lowerQuery.includes("mini")) {
       mappedSize = "MINI";
@@ -783,15 +848,22 @@ export function getProductRecommendations(query: string): Product[] {
       mappedSize = "MEDIUM";
     } else if (lowerQuery.includes("large")) {
       mappedSize = "LARGE";
-    } else if (lowerQuery.includes("xl") || lowerQuery.includes("extra large")) {
+    } else if (
+      lowerQuery.includes("xl") ||
+      lowerQuery.includes("extra large")
+    ) {
       mappedSize = "XL";
-    } else if (lowerQuery.includes("2xl") || lowerQuery.includes("xxl") || lowerQuery.includes("2x")) {
+    } else if (
+      lowerQuery.includes("2xl") ||
+      lowerQuery.includes("xxl") ||
+      lowerQuery.includes("2x")
+    ) {
       mappedSize = "2XL";
     } else {
       // Default to 2XL if they previously mentioned it
       mappedSize = "2XL";
     }
-    
+
     // Try to determine configuration
     if (lowerQuery.includes("table") || lowerQuery.includes("acacia")) {
       if (mappedSize === "LARGE") {
@@ -806,7 +878,7 @@ export function getProductRecommendations(query: string): Product[] {
       // Default to standalone cover
       recommendations.push(products[`EGG-COVER-${mappedSize}`]);
     }
-    
+
     // If we found recommendations, return them
     if (recommendations.length > 0) {
       return recommendations;
@@ -909,104 +981,203 @@ export function getComplementaryProducts(productId: string): Product[] {
   return product.relatedProducts.map((id) => products[id]).filter(Boolean);
 }
 
-// Function to recommend EGG size based on household size and cooking needs
-export function recommendEggSize(query: string): EggSizeRecommendation | null {
-  const lowerQuery = query.toLowerCase();
+// Function to recommend an EGG size based on the user's needs
+export function recommendEggSize(message: string): string {
+  const lowerMessage = message.toLowerCase();
+  console.log("DEBUG: recommendEggSize called with:", lowerMessage);
 
-  // Check for specific numbers first
+  // First, check for specific egg sizes mentioned
   if (
-    lowerQuery.match(/\b(1[2-9]|[2-9]\d+)\b/) || // Matches 12 or more
-    lowerQuery.includes("twelve") ||
-    lowerQuery.includes("thirteen") ||
-    lowerQuery.includes("fourteen") ||
-    lowerQuery.includes("fifteen") ||
-    lowerQuery.includes("sixteen") ||
-    lowerQuery.includes("seventeen") ||
-    lowerQuery.includes("eighteen") ||
-    lowerQuery.includes("nineteen") ||
-    lowerQuery.includes("twenty") ||
-    lowerQuery.includes("many people") ||
-    lowerQuery.includes("lots of people") ||
-    lowerQuery.includes("large group") ||
-    lowerQuery.includes("big group")
+    lowerMessage.includes("2xl") ||
+    lowerMessage.includes("2-xl") ||
+    lowerMessage.includes("xxl") ||
+    lowerMessage.includes("commercial") ||
+    lowerMessage.includes("restaurant") ||
+    lowerMessage.includes("catering")
   ) {
-    return eggSizeRecommendations["COMMERCIAL"];
-  }
-
-  // Check for 6-11 people
-  if (
-    lowerQuery.match(/\b([6-9]|1[0-1])\b/) || // Matches 6-11
-    lowerQuery.includes("six") ||
-    lowerQuery.includes("seven") ||
-    lowerQuery.includes("eight") ||
-    lowerQuery.includes("nine") ||
-    lowerQuery.includes("ten") ||
-    lowerQuery.includes("eleven") ||
-    lowerQuery.includes("6 people") ||
-    lowerQuery.includes("7 people") ||
-    lowerQuery.includes("8 people") ||
-    lowerQuery.includes("9 people") ||
-    lowerQuery.includes("10 people") ||
-    lowerQuery.includes("11 people") ||
-    lowerQuery.includes("for 6") ||
-    lowerQuery.includes("for 7") ||
-    lowerQuery.includes("for 8") ||
-    lowerQuery.includes("for 9") ||
-    lowerQuery.includes("for 10") ||
-    lowerQuery.includes("for 11") ||
-    lowerQuery.includes("for six") ||
-    lowerQuery.includes("for seven") ||
-    lowerQuery.includes("for eight") ||
-    lowerQuery.includes("for nine") ||
-    lowerQuery.includes("for ten") ||
-    lowerQuery.includes("for eleven")
-  ) {
-    return eggSizeRecommendations["LARGE-FAMILY"];
+    return "2XL";
   }
 
   if (
-    lowerQuery.includes("single") ||
-    lowerQuery.includes("just me") ||
-    lowerQuery.includes("portable") ||
-    lowerQuery.includes("camping") ||
-    lowerQuery.includes("tailgating") ||
-    lowerQuery.includes("balcony") ||
-    lowerQuery.includes("small space")
+    lowerMessage.includes("xl") ||
+    lowerMessage.includes("x-large") ||
+    lowerMessage.includes("extra large")
   ) {
-    return eggSizeRecommendations["SINGLE-PERSON"];
-  } else if (
-    lowerQuery.includes("small family") ||
-    lowerQuery.includes("couple") ||
-    lowerQuery.includes("2-3 people") ||
-    lowerQuery.includes("2 to 3 people")
-  ) {
-    return eggSizeRecommendations["SMALL-FAMILY"];
-  } else if (
-    lowerQuery.includes("family") ||
-    lowerQuery.includes("3-5 people") ||
-    lowerQuery.includes("3 to 5 people") ||
-    lowerQuery.includes("average")
-  ) {
-    return eggSizeRecommendations["AVERAGE-FAMILY"];
-  } else if (
-    lowerQuery.includes("large family") ||
-    lowerQuery.includes("entertain") ||
-    lowerQuery.includes("5-8 people") ||
-    lowerQuery.includes("5 to 8 people") ||
-    lowerQuery.includes("big family")
-  ) {
-    return eggSizeRecommendations["LARGE-FAMILY"];
-  } else if (
-    lowerQuery.includes("commercial") ||
-    lowerQuery.includes("restaurant") ||
-    lowerQuery.includes("very large") ||
-    lowerQuery.includes("huge") ||
-    lowerQuery.includes("catering")
-  ) {
-    return eggSizeRecommendations["COMMERCIAL"];
+    return "XL";
   }
 
-  return null;
+  if (lowerMessage.includes("large") && !lowerMessage.includes("x")) {
+    return "Large";
+  }
+
+  if (lowerMessage.includes("medium") || lowerMessage.includes("med")) {
+    return "Medium";
+  }
+
+  if (lowerMessage.includes("small") && !lowerMessage.includes("minimax")) {
+    return "Small";
+  }
+
+  if (
+    lowerMessage.includes("minimax") ||
+    lowerMessage.includes("mini max") ||
+    lowerMessage.includes("mini-max")
+  ) {
+    return "MiniMax";
+  }
+
+  if (
+    lowerMessage.includes("mini") &&
+    !lowerMessage.includes("minimax") &&
+    !lowerMessage.includes("mini max")
+  ) {
+    return "Mini";
+  }
+
+  // Special case for 2 people + camping/portable needs
+  if (
+    (lowerMessage.includes("2 people") ||
+      lowerMessage.includes("two people") ||
+      lowerMessage.includes("couple") ||
+      lowerMessage.includes("just two") ||
+      lowerMessage.includes("just 2") ||
+      lowerMessage.match(/cook(ing)?\s+for\s+(2|two)/i)) &&
+    (lowerMessage.includes("camping") ||
+      lowerMessage.includes("camp") ||
+      lowerMessage.includes("portable") ||
+      lowerMessage.includes("travel") ||
+      lowerMessage.includes("mobility") ||
+      lowerMessage.includes("take with") ||
+      lowerMessage.includes("outdoors"))
+  ) {
+    console.log(
+      "DEBUG: Detected cooking for 2 people with camping/portability needs"
+    );
+    return "MiniMax";
+  }
+
+  // Check for number of people directly mentioned
+  const capacityMatches = lowerMessage.match(
+    /(\d+)\s*(?:people|persons|guests|family members|crowd|group)/i
+  );
+  if (capacityMatches && capacityMatches[1]) {
+    const peopleCount = parseInt(capacityMatches[1], 10);
+    console.log(`DEBUG: Detected cooking for ${peopleCount} people`);
+
+    if (peopleCount >= 15) {
+      return "2XL";
+    } else if (peopleCount >= 8) {
+      return "XL";
+    } else if (peopleCount >= 4) {
+      return "Large";
+    } else if (peopleCount >= 2) {
+      // Check if they also mentioned camping/portability for 2 people
+      if (
+        lowerMessage.includes("camping") ||
+        lowerMessage.includes("camp") ||
+        lowerMessage.includes("portable") ||
+        lowerMessage.includes("travel") ||
+        lowerMessage.includes("mobility") ||
+        lowerMessage.includes("take with") ||
+        lowerMessage.includes("outdoors")
+      ) {
+        return "MiniMax";
+      }
+      return "Medium";
+    } else {
+      return "Small";
+    }
+  }
+
+  // Infer based on household size and cooking needs
+  if (
+    lowerMessage.includes("commercial") ||
+    lowerMessage.includes("restaurant") ||
+    lowerMessage.includes("many guests") ||
+    lowerMessage.includes("large group") ||
+    lowerMessage.includes("large gathering") ||
+    lowerMessage.includes("big group") ||
+    lowerMessage.includes("catering") ||
+    lowerMessage.includes("big gathering") ||
+    lowerMessage.includes("party") ||
+    lowerMessage.includes("event") ||
+    lowerMessage.includes("lot of people") ||
+    lowerMessage.includes("lots of people") ||
+    lowerMessage.includes("many people")
+  ) {
+    return "2XL";
+  }
+
+  if (
+    lowerMessage.includes("large family") ||
+    lowerMessage.includes("big family") ||
+    lowerMessage.includes("extended family") ||
+    lowerMessage.includes("entertaining") ||
+    lowerMessage.includes("many dishes") ||
+    lowerMessage.includes("multiple dishes") ||
+    lowerMessage.includes("several people")
+  ) {
+    return "XL";
+  }
+
+  if (
+    lowerMessage.includes("family") ||
+    lowerMessage.includes("4-6 people") ||
+    lowerMessage.includes("average household") ||
+    lowerMessage.includes("standard") ||
+    lowerMessage.includes("normal") ||
+    lowerMessage.includes("regular")
+  ) {
+    return "Large";
+  }
+
+  if (
+    lowerMessage.includes("small family") ||
+    lowerMessage.includes("couple") ||
+    lowerMessage.includes("2-3 people") ||
+    lowerMessage.includes("limited space") ||
+    lowerMessage.includes("not much space")
+  ) {
+    return "Medium";
+  }
+
+  if (
+    lowerMessage.includes("single") ||
+    lowerMessage.includes("just me") ||
+    lowerMessage.includes("individual") ||
+    lowerMessage.includes("one person") ||
+    lowerMessage.includes("only me") ||
+    lowerMessage.includes("very limited space") ||
+    lowerMessage.includes("tiny space") ||
+    lowerMessage.includes("patio") ||
+    lowerMessage.includes("balcony")
+  ) {
+    return "Small";
+  }
+
+  if (
+    lowerMessage.includes("portable") ||
+    lowerMessage.includes("camping") ||
+    lowerMessage.includes("tailgating") ||
+    lowerMessage.includes("travel") ||
+    lowerMessage.includes("take with me") ||
+    lowerMessage.includes("take it with") ||
+    lowerMessage.includes("mobile")
+  ) {
+    return "MiniMax";
+  }
+
+  if (
+    lowerMessage.includes("smallest") ||
+    lowerMessage.includes("most portable") ||
+    lowerMessage.includes("picnic") ||
+    lowerMessage.includes("tabletop")
+  ) {
+    return "Mini";
+  }
+
+  // Default to Large as it's the most popular size if we can't determine anything else
+  return "Large";
 }
 
 // Function to generate a product recommendation message
@@ -1077,10 +1248,9 @@ export function generateEggSizeRecommendationMessage(
 export function generateGuidedSelectionMessage(): string {
   return (
     "I'd be happy to help you find the perfect Big Green Egg products! To get started, could you tell me:\n\n" +
-    "• Do you already own a Big Green Egg? If so, which size?\n\n" +
     "• What type of cooking are you most interested in? (Grilling, smoking, baking, pizza, etc.)\n\n" +
     "• How many people do you typically cook for?\n\n" +
-    "This will help me recommend the best products for your specific needs."
+    "This will help me recommend the best egg for your specific needs."
   );
 }
 
@@ -1104,14 +1274,21 @@ export function isProductSelectionQuery(query: string): boolean {
 }
 
 // Function to recommend a cover based on EGG size and configuration
-export function recommendEggCover(eggSize: string, configuration: string): Product[] {
+export function recommendEggCover(
+  eggSize: string,
+  configuration: string
+): Product[] {
   const recommendations: Product[] = [];
   const size = eggSize.toLowerCase();
   const config = configuration.toLowerCase();
-  
+
   // Map user input to actual EGG sizes
   let mappedSize = "";
-  if (size.includes("minimax") || size.includes("mini max") || size.includes("mini-max")) {
+  if (
+    size.includes("minimax") ||
+    size.includes("mini max") ||
+    size.includes("mini-max")
+  ) {
     mappedSize = "MINI";
   } else if (size.includes("mini")) {
     mappedSize = "MINI";
@@ -1123,15 +1300,22 @@ export function recommendEggCover(eggSize: string, configuration: string): Produ
     mappedSize = "LARGE";
   } else if (size.includes("xl") || size.includes("extra large")) {
     mappedSize = "XL";
-  } else if (size.includes("2xl") || size.includes("xxl") || size.includes("2x")) {
+  } else if (
+    size.includes("2xl") ||
+    size.includes("xxl") ||
+    size.includes("2x")
+  ) {
     mappedSize = "2XL";
   } else {
     // Default to Large if size is unclear
     mappedSize = "LARGE";
   }
-  
+
   // Recommend cover based on configuration and size
-  if (config.includes("acacia table") || (config.includes("table") && config.includes("acacia"))) {
+  if (
+    config.includes("acacia table") ||
+    (config.includes("table") && config.includes("acacia"))
+  ) {
     if (mappedSize === "LARGE") {
       recommendations.push(products["TABLE-COVER-LARGE"]);
     } else if (mappedSize === "XL") {
@@ -1167,13 +1351,19 @@ export function recommendEggCover(eggSize: string, configuration: string): Produ
     }
   } else if (config.includes("cooking island 76")) {
     if (mappedSize === "LARGE" || mappedSize === "XL") {
-      recommendations.push(products["COOKING-ISLAND-COVER-" + mappedSize + "-76"]);
+      recommendations.push(
+        products["COOKING-ISLAND-COVER-" + mappedSize + "-76"]
+      );
     } else {
       // For other sizes, no specific covers
       recommendations.push(products[`EGG-COVER-${mappedSize}`]);
     }
   } else if (config.includes("modular") && config.includes("expansion")) {
-    if (mappedSize === "MEDIUM" || mappedSize === "LARGE" || mappedSize === "XL") {
+    if (
+      mappedSize === "MEDIUM" ||
+      mappedSize === "LARGE" ||
+      mappedSize === "XL"
+    ) {
       recommendations.push(products["EXPANSION-COVER-" + mappedSize]);
     } else {
       // For other sizes, no specific covers
@@ -1188,7 +1378,11 @@ export function recommendEggCover(eggSize: string, configuration: string): Produ
       // For other sizes, no specific covers
       recommendations.push(products[`EGG-COVER-${mappedSize}`]);
     }
-  } else if (config.includes("nest") || config.includes("stand") || config.includes("handler")) {
+  } else if (
+    config.includes("nest") ||
+    config.includes("stand") ||
+    config.includes("handler")
+  ) {
     recommendations.push(products[`NEST-COVER-${mappedSize}`]);
   } else if (config.includes("built-in") || config.includes("builtin")) {
     recommendations.push(products[`EGG-COVER-${mappedSize}`]);
@@ -1202,32 +1396,35 @@ export function recommendEggCover(eggSize: string, configuration: string): Produ
       recommendations.push(products[`EGG-COVER-${mappedSize}`]);
     }
   }
-  
+
   return recommendations;
 }
 
 // Function to check if a query is asking about EGG covers
 export function isEggCoverQuery(query: string): boolean {
   const lowerQuery = query.toLowerCase();
-  
+
   // Check for direct cover queries
-  const hasCoverTerm = lowerQuery.includes("cover") || 
-                        lowerQuery.includes("covering") || 
-                        lowerQuery.includes("protection") ||
-                        lowerQuery.includes("protect");
-  
+  const hasCoverTerm =
+    lowerQuery.includes("cover") ||
+    lowerQuery.includes("covering") ||
+    lowerQuery.includes("protection") ||
+    lowerQuery.includes("protect");
+
   // Check for EGG related terms
-  const hasEggTerm = lowerQuery.includes("egg") || 
-                     lowerQuery.includes("bge") || 
-                     lowerQuery.includes("big green egg") ||
-                     lowerQuery.includes("grill");
-                     
+  const hasEggTerm =
+    lowerQuery.includes("egg") ||
+    lowerQuery.includes("bge") ||
+    lowerQuery.includes("big green egg") ||
+    lowerQuery.includes("grill");
+
   // Check for standalone cover requests
-  const isStandaloneCoverRequest = lowerQuery === "cover" ||
-                                   lowerQuery === "i need a cover" ||
-                                   lowerQuery === "can you give me a cover" ||
-                                   lowerQuery.startsWith("cover for");
-  
+  const isStandaloneCoverRequest =
+    lowerQuery === "cover" ||
+    lowerQuery === "i need a cover" ||
+    lowerQuery === "can you give me a cover" ||
+    lowerQuery.startsWith("cover for");
+
   return (hasCoverTerm && hasEggTerm) || isStandaloneCoverRequest;
 }
 
@@ -1251,4 +1448,95 @@ export function generateEggCoverRecommendationMessage(
     "This cover is specially designed to protect your EGG from weather elements like rain, sun, and dust. Would you like information about any other accessories for your Big Green Egg?";
 
   return message;
+}
+
+// Add this new function after the containsEggSize function
+export function parseEggSize(message: string): string {
+  // Default to Large if no size is specified
+  let eggSize = "Large";
+
+  const lowerMessage = message.toLowerCase();
+
+  // Special case for camping scenarios with small number of people
+  if (
+    (lowerMessage.includes("camping") ||
+      lowerMessage.includes("camp") ||
+      lowerMessage.includes("portable") ||
+      lowerMessage.includes("travel") ||
+      lowerMessage.includes("mobility") ||
+      lowerMessage.includes("take with") ||
+      lowerMessage.includes("outdoors")) &&
+    (lowerMessage.includes("2 people") ||
+      lowerMessage.includes("two people") ||
+      lowerMessage.includes("couple") ||
+      lowerMessage.includes("just two") ||
+      lowerMessage.includes("just 2") ||
+      lowerMessage.match(/cook(ing)?\s+for\s+(2|two)/i))
+  ) {
+    console.log(
+      "DEBUG: Parsing message with camping + small number of people, suggesting MiniMax"
+    );
+    return "MiniMax";
+  }
+
+  // Check for specific sizes in order of specificity
+  if (
+    lowerMessage.includes("2xl") ||
+    lowerMessage.includes("xxl") ||
+    lowerMessage.includes("2x") ||
+    lowerMessage.includes("2-xl") ||
+    lowerMessage.includes("2 xl") ||
+    lowerMessage.includes("2x large") ||
+    (lowerMessage.includes("2") && lowerMessage.includes("extra large"))
+  ) {
+    eggSize = "2XL";
+  } else if (
+    lowerMessage.includes("xl") ||
+    lowerMessage.includes("x-large") ||
+    lowerMessage.includes("extra large") ||
+    lowerMessage.includes("x large") ||
+    lowerMessage.includes("xtra large")
+  ) {
+    eggSize = "XL";
+  } else if (
+    lowerMessage.includes("large") &&
+    !lowerMessage.includes("xl") &&
+    !lowerMessage.includes("extra")
+  ) {
+    eggSize = "Large";
+  } else if (lowerMessage.includes("medium") || lowerMessage.includes("med")) {
+    eggSize = "Medium";
+  } else if (
+    lowerMessage.includes("small") &&
+    !lowerMessage.includes("minimax") &&
+    !lowerMessage.includes("mini max")
+  ) {
+    eggSize = "Small";
+  } else if (
+    lowerMessage.includes("minimax") ||
+    lowerMessage.includes("mini max") ||
+    lowerMessage.includes("mini-max")
+  ) {
+    eggSize = "MiniMax";
+  } else if (
+    lowerMessage.includes("mini") &&
+    !lowerMessage.includes("minimax") &&
+    !lowerMessage.includes("mini max")
+  ) {
+    eggSize = "Mini";
+  } else if (
+    // Check for portable/camping needs without explicit size
+    (lowerMessage.includes("camping") ||
+      lowerMessage.includes("camp") ||
+      lowerMessage.includes("portable") ||
+      lowerMessage.includes("travel") ||
+      lowerMessage.includes("take with me") ||
+      lowerMessage.includes("take it with") ||
+      lowerMessage.includes("mobile")) &&
+    lowerMessage.includes("small") // If they mention "small" with camping
+  ) {
+    eggSize = "MiniMax";
+  }
+
+  return eggSize;
 }
