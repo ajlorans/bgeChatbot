@@ -177,7 +177,7 @@ export default function AgentDashboardPage() {
           <h2 className="text-xl font-bold mb-2">No Agent Data Available</h2>
           <p className="mb-4">Unable to retrieve agent information.</p>
           <button
-            onClick={() => router.push("/login/agent")}
+            onClick={() => router.push("/agent-login")}
             className="px-4 py-2 bg-primary text-white rounded-md"
           >
             Return to Login

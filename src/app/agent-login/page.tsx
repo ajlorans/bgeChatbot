@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import SimpleLogin from "./simple-login";
 
+export const dynamic = "force-dynamic";
+
 export default function AgentLogin() {
   const searchParams = useSearchParams();
   const logoutParam = searchParams?.get("logout");

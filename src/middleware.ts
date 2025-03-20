@@ -38,7 +38,7 @@ export function middleware(req: NextRequest) {
   }
 
   // Skip middleware for the login page to prevent redirect loops
-  if (pathname === "/agent-login") {
+  if (pathname === "/agent-login" || pathname === "/login/agent") {
     console.log("[Middleware] Allowing access to login page");
     return NextResponse.next();
   }

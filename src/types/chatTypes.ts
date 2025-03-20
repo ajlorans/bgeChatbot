@@ -12,6 +12,7 @@ export interface Message {
   metadata?: any;
   chatSessionId?: string;
   category?: string;
+  agentName?: string;
 }
 
 /**

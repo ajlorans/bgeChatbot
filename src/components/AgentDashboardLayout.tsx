@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 interface Agent {
   id: string;
@@ -25,12 +26,30 @@ export function AgentDashboardLayout({
   isFallbackMode = false,
 }: AgentDashboardLayoutProps) {
   const router = useRouter();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const handleLogout = () => {
-    // Clear cookies and redirect
-    document.cookie =
-      "agent_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-    router.push("/login/agent?logout=true");
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+
+    try {
+      const response = await fetch("/api/agent/logout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.ok) {
+        // Redirect to login page with logout parameter
+        router.push("/agent-login?logout=true");
+      } else {
+        console.error("Logout failed:", await response.text());
+        setIsLoggingOut(false);
+      }
+    } catch (error) {
+      console.error("Logout error:", error);
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -59,9 +78,10 @@ export function AgentDashboardLayout({
 
             <button
               onClick={handleLogout}
-              className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+              disabled={isLoggingOut}
+              className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
             >
-              Logout
+              {isLoggingOut ? "Logging out..." : "Logout"}
             </button>
           </div>
         </div>
