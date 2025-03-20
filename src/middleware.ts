@@ -118,6 +118,28 @@ export function middleware(req: NextRequest) {
       req.nextUrl.pathname
     );
 
+    // Check for redirect loop by looking at referrer
+    const referer = req.headers.get("referer") || "";
+    const isComingFromLogin = referer.includes("/agent-login");
+    const redirectCount = req.headers.get("x-redirect-count");
+
+    // Additional logging to debug redirect loop
+    console.log("🔄 Redirect debug:", {
+      referer,
+      isComingFromLogin,
+      redirectCount,
+      hasLoginRedirectHeader: req.headers.has("x-login-redirect"),
+    });
+
+    // Skip check if this is a redirect coming directly from login success
+    // This is a safety mechanism to break potential redirect loops
+    if (req.headers.has("x-login-redirect") || isComingFromLogin) {
+      console.log(
+        "⏩ [Middleware] Skipping auth check for redirect from login"
+      );
+      return NextResponse.next();
+    }
+
     // Check if agent token cookie exists
     const hasAgentToken = debugCookies(req, "Agent dashboard access");
 

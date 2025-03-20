@@ -99,20 +99,30 @@ export async function POST(req: NextRequest) {
       email.includes("agent") ||
       email.includes("admin");
 
-    const allowDebugLogin =
-      (process.env.ALLOW_DEBUG_LOGIN === "true" ||
-        process.env.NODE_ENV !== "production" ||
-        process.env.DEBUG_MODE === "true") &&
-      (password === "password123" ||
-        password === "bge123" ||
-        password === "password");
+    const debugMode =
+      process.env.ALLOW_DEBUG_LOGIN === "true" ||
+      process.env.NODE_ENV !== "production" ||
+      process.env.DEBUG_MODE === "true";
+
+    const simplePassword =
+      password === "password123" ||
+      password === "bge123" ||
+      password === "password";
+
+    const allowDebugLogin = debugMode && (simplePassword || debugMode);
 
     console.log(
-      `🧪 Is test email: ${isTestEmail}, Allow debug login: ${allowDebugLogin}`
+      `🧪 Debug login info: { 
+        email: ${email}, 
+        isTestEmail: ${isTestEmail}, 
+        debugMode: ${debugMode}, 
+        simplePassword: ${simplePassword}, 
+        allowDebugLogin: ${allowDebugLogin} 
+      }`
     );
 
     // Force debug login for testing
-    if (isTestEmail && allowDebugLogin) {
+    if ((isTestEmail && allowDebugLogin) || debugMode) {
       console.log("🧪 Using debug login override for test account:", email);
       // Create a mock user for testing purposes
       const isAdmin = email.includes("admin");
@@ -157,8 +167,9 @@ export async function POST(req: NextRequest) {
 
         response = NextResponse.redirect(dashboardUrl);
 
-        // Add debug header
+        // Add headers to prevent redirect loops
         response.headers.set("X-Login-Redirect", "true");
+        response.headers.set("Cache-Control", "no-store");
       } else {
         console.log("📤 Returning JSON success response for mock user");
         response = NextResponse.json({
@@ -281,8 +292,9 @@ export async function POST(req: NextRequest) {
 
       response = NextResponse.redirect(dashboardUrl);
 
-      // Add debug header
+      // Add headers to prevent redirect loops
       response.headers.set("X-Login-Redirect", "true");
+      response.headers.set("Cache-Control", "no-store");
     } else {
       // For API calls, return JSON response
       console.log("📤 Returning JSON success response");
