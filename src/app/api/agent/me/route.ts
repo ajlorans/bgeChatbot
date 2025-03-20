@@ -1,97 +1,129 @@
+import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getServerSession } from "@/lib/session";
 
 export async function GET() {
   try {
-    // Get the authenticated session
+    // Get the session data from the server
     const session = await getServerSession();
+    console.log("Agent/me API: Session data:", JSON.stringify(session));
 
-    // If no session or not an agent, return unauthorized
-    if (!session || !session.user || !session.user.agentId) {
+    // Check if the user is authenticated
+    if (!session || !session.user) {
+      console.error("Agent/me API: No authenticated session found");
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    const userEmail = session.user.email;
+    if (!userEmail) {
+      console.error("Agent/me API: Missing email in session");
       return NextResponse.json(
-        { authenticated: false, message: "Not authenticated" },
+        { error: "Invalid session data - missing email" },
         { status: 401 }
       );
     }
 
-    // Get agent details from database
+    // Find the user by email
+    console.log(`Agent/me API: Finding user with email ${userEmail}`);
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+    });
+
+    // If no user found, return 401
+    if (!user) {
+      console.error(`Agent/me API: No user found for email ${userEmail}`);
+
+      // If in debug mode, return mock data
+      if (process.env.DEBUG_MODE === "true") {
+        console.log("DEBUG MODE: Returning mock agent data");
+        return NextResponse.json({
+          id: "debug-agent-id",
+          role: "agent",
+          name: "Debug Agent",
+          email: userEmail,
+          isActive: true,
+          isAvailable: true,
+          activeSessions: 0,
+          waitingSessions: 0,
+          debugMode: true,
+        });
+      }
+
+      return NextResponse.json({ error: "User not found" }, { status: 401 });
+    }
+
+    // Find the agent associated with the user
+    console.log(`Agent/me API: Finding agent for userId ${user.id}`);
     const agent = await prisma.agent.findUnique({
-      where: {
-        id: session.user.agentId,
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-          },
-        },
-      },
+      where: { userId: user.id },
     });
 
+    // If no agent found, return 401
     if (!agent) {
-      return NextResponse.json(
-        { authenticated: false, message: "Agent not found" },
-        { status: 401 }
-      );
+      console.error(`Agent/me API: No agent found for user ${user.id}`);
+
+      // If in debug mode, return mock data
+      if (process.env.DEBUG_MODE === "true") {
+        console.log("DEBUG MODE: Returning mock agent data");
+        return NextResponse.json({
+          id: "debug-agent-id",
+          role: user.role || "agent",
+          name: user.name,
+          email: user.email,
+          isActive: true,
+          isAvailable: true,
+          activeSessions: 0,
+          waitingSessions: 0,
+          debugMode: true,
+        });
+      }
+
+      return NextResponse.json({ error: "Not an agent" }, { status: 401 });
     }
 
-    // Get counts of active and waiting sessions
-    const activeSessionsCount = await prisma.chatSession.count({
-      where: {
-        agentId: agent.id,
-        status: "active",
-      },
-    });
+    // Count active chat sessions for this agent
+    let activeSessions = 0;
+    let waitingSessions = 0;
 
-    const waitingSessionsCount = await prisma.chatSession.count({
-      where: {
-        status: "waiting",
-      },
-    });
-
-    // Check if agent is active
-    if (!agent.isActive) {
-      return NextResponse.json(
-        {
-          authenticated: true,
-          message: "Agent account is deactivated",
-          user: {
-            id: agent.user.id,
-            name: agent.user.name,
-            email: agent.user.email,
-            role: agent.user.role,
-            status: "inactive",
-          },
+    try {
+      activeSessions = await prisma.chatSession.count({
+        where: {
+          agentId: agent.id,
+          status: "active",
         },
-        { status: 403 }
-      );
+      });
+
+      waitingSessions = await prisma.chatSession.count({
+        where: {
+          status: "waiting",
+        },
+      });
+    } catch (error) {
+      console.error("Error counting chat sessions:", error);
+      // Continue with default values of 0
     }
 
-    // Return agent data
+    // Return the agent data
     return NextResponse.json({
-      authenticated: true,
-      user: {
-        id: agent.user.id,
-        name: agent.user.name,
-        email: agent.user.email,
-        role: agent.user.role,
-        agentId: agent.id,
-        status: "active",
-        lastActive: agent.lastActive,
-      },
-      stats: {
-        activeSessions: activeSessionsCount,
-        waitingSessions: waitingSessionsCount,
-      },
+      id: agent.id,
+      role: agent.role,
+      name: user.name,
+      email: user.email,
+      isActive: agent.isActive,
+      isAvailable: agent.isAvailable,
+      activeSessions,
+      waitingSessions,
     });
-  } catch (error) {
-    console.error("Error fetching agent data:", error);
+  } catch (dbError: unknown) {
+    console.error("Error in agent/me API route:", dbError);
+
+    // Return a detailed error response
     return NextResponse.json(
-      { authenticated: false, error: "Internal server error" },
+      {
+        error: "Failed to retrieve agent data",
+        details: dbError instanceof Error ? dbError.message : String(dbError),
+        debugMode: process.env.DEBUG_MODE === "true",
+      },
       { status: 500 }
     );
   }
