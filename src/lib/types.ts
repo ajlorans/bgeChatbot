@@ -15,6 +15,11 @@ export interface Message {
   chatSessionId?: string;
 }
 
+// Add type definition for Next.js API route handlers with dynamic params
+export interface RouteHandlerParams<T extends Record<string, string>> {
+  params: T;
+}
+
 export interface ChatSession {
   id: string;
   messages: Message[];
