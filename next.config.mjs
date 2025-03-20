@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false,
-  swcMinify: true,
 
   env: {
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
@@ -20,10 +19,6 @@ const nextConfig = {
   // Disable ESLint checking during build
   eslint: {
     ignoreDuringBuilds: true,
-  },
-  // Updated external packages config
-  experimental: {
-    serverExternalPackages: ["prisma", "@prisma/client"],
   },
   // Configure static and dynamic page behavior
   output: "standalone",
@@ -46,11 +41,26 @@ const nextConfig = {
     ];
   },
   // Added to ensure socket connections work properly
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
+    // Handle Node.js modules on client-side
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+        dns: false,
+        child_process: false,
+        bufferutil: false,
+        "utf-8-validate": false,
+      };
+    }
+
     config.externals = [
       ...(config.externals || []),
       { bufferutil: "bufferutil", "utf-8-validate": "utf-8-validate" },
     ];
+
     return config;
   },
 };

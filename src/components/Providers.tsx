@@ -2,7 +2,7 @@
 
 import React from "react";
 import { usePathname } from "next/navigation";
-import { shouldConnectSocket } from "@/lib/socketService";
+import { shouldConnectSocket } from "@/lib/socketService.client";
 
 // Wrapper to conditionally initialize services
 export default function Providers({ children }: { children: React.ReactNode }) {

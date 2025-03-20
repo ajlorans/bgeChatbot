@@ -7,12 +7,12 @@ import React, {
   useState,
   useCallback,
 } from "react";
-import { io, Socket } from "socket.io-client";
+import { Socket } from "socket.io-client";
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
-} from "@/lib/socketService";
-import { shouldConnectSocket } from "@/lib/socketService";
+} from "@/lib/socketService.client";
+import { shouldConnectSocket, createSocket } from "@/lib/socketService.client";
 import { v4 as uuidv4 } from "uuid";
 import { Message } from "@/types/chatTypes";
 import { usePathname } from "next/navigation";
@@ -149,17 +149,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
     console.log(`[Socket] Initializing socket connection on ${pathname}`);
 
-    // Initialize socket connection with more aggressive reconnection strategy
-    const socketInstance = io({
-      path: "/api/socket",
-      autoConnect: true,
-      reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 2000,
-      timeout: 10000,
-      transports: ["polling", "websocket"],
-      withCredentials: true,
-    });
+    // Initialize socket connection
+    const socketInstance = createSocket();
 
     // Log debug info
     console.log("[Socket] Initializing with path: /api/socket");
