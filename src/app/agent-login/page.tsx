@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
-import Link from "next/link";
+import SimpleLogin from "./simple-login";
 
 export default function AgentLogin() {
   const searchParams = useSearchParams();
@@ -15,21 +15,44 @@ export default function AgentLogin() {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [showDevOptions, setShowDevOptions] = useState(false);
+  const [usingFallback, setUsingFallback] = useState(false);
 
-  // Check if in development mode
+  // Handle direct bypass
+  const handleBypass = () => {
+    try {
+      // Set cookie directly in browser
+      document.cookie = `agent_token=BYPASS_TOKEN_${Date.now()}; path=/; max-age=${
+        8 * 60 * 60
+      }; SameSite=Lax`;
+
+      // Redirect to dashboard
+      window.location.href = "/agent-dashboard";
+    } catch (error) {
+      console.error("Error during bypass:", error);
+      // Fallback to direct URL
+      window.location.href = "/agent-bypass";
+    }
+  };
+
+  // Try to detect JS loading errors and use fallback if needed
   useEffect(() => {
-    // Check if we're in development mode
-    const isDev =
-      window.location.hostname === "localhost" ||
-      window.location.hostname === "127.0.0.1" ||
-      window.location.hostname.includes("vercel.app");
+    try {
+      // Check if we're in development mode
+      const isDev =
+        window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1" ||
+        window.location.hostname.includes("vercel.app");
 
-    setShowDevOptions(isDev);
+      setShowDevOptions(isDev);
 
-    // Pre-fill test credentials in development
-    if (isDev) {
-      setEmail("agent@example.com");
-      setPassword("password123");
+      // Pre-fill test credentials in development
+      if (isDev) {
+        setEmail("agent@example.com");
+        setPassword("password123");
+      }
+    } catch (error) {
+      console.error("JS error detected, switching to fallback login:", error);
+      setUsingFallback(true);
     }
   }, []);
 
@@ -47,6 +70,11 @@ export default function AgentLogin() {
         .catch((err) => console.error("Logout error:", err));
     }
   }, [logoutParam]);
+
+  // If using fallback, show simple login
+  if (usingFallback) {
+    return <SimpleLogin />;
+  }
 
   // Simple form submit - Leverage browser navigation to ensure proper redirect
   return (
@@ -150,12 +178,13 @@ export default function AgentLogin() {
           {showDevOptions && (
             <div className="mt-4 text-center">
               <p className="text-xs text-gray-500 mb-2">Development options:</p>
-              <Link
-                href="/agent-bypass"
+              <button
+                type="button"
+                onClick={handleBypass}
                 className="text-xs text-blue-600 hover:underline"
               >
                 Bypass login (development only)
-              </Link>
+              </button>
             </div>
           )}
 
