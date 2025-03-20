@@ -53,11 +53,7 @@ export default function handler(
       "X-Requested-With, Content-Type, Accept, Authorization, Cache-Control"
     );
 
-    // Increase timeout for the response
-    res.setHeader("Connection", "keep-alive");
-    res.setHeader("Keep-Alive", "timeout=120");
-
-    // Handle preflight requests
+    // Handle preflight requests (respond quickly to OPTIONS)
     if (req.method === "OPTIONS") {
       console.log("🔄 Handling OPTIONS preflight request");
       res.status(200).end();
@@ -65,30 +61,39 @@ export default function handler(
     }
 
     console.log(`🔄 Socket request method: ${req.method}`);
-    console.log("🔑 Auth header present:", !!req.headers.authorization);
-    console.log("🍪 Cookie header present:", !!req.headers.cookie);
 
-    // Initialize the socket server with debug mode for more visibility
+    // For GET requests (which might be socket connections)
+    // Initialize the socket server only if we haven't done so already
+    if (res.socket.server.io) {
+      console.log("✅ Socket.io already initialized, returning quickly");
+      // Return a quick response for polling requests
+      res.status(200).json({
+        message: "Socket server already running",
+        success: true,
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+
+    // Initialize the socket server
     console.log("🔌 Initializing socket server...");
     initSocketServer(req, res);
-    console.log("✅ Socket server initialization called");
+    console.log("✅ Socket server initialization completed");
 
-    // For non-WebSocket requests, return a quick response to avoid timeout
+    // Return a quick response for the initial socket connection
     if (!res.socket?.destroyed) {
       console.log("📤 Sending socket initialization confirmation");
       res.status(200).json({
         message: "Socket server initialized",
         success: true,
         timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV,
-        debug: true,
       });
     }
   } catch (error) {
-    console.error("❌ Error initializing socket server:", error);
+    console.error("❌ Error in socket handler:", error);
     if (!res.socket?.destroyed) {
       res.status(500).json({
-        message: "Failed to initialize socket server",
+        message: "Failed to handle socket request",
         error: String(error),
         timestamp: new Date().toISOString(),
       });
@@ -96,11 +101,11 @@ export default function handler(
   }
 }
 
-// Configure Next.js to handle WebSockets with longer timeouts
+// Configure Next.js to handle WebSockets
 export const config = {
   api: {
     bodyParser: false,
-    externalResolver: true, // This tells Next.js that this route is handled by an external resolver
-    responseLimit: false, // Remove response size limit
+    externalResolver: true,
+    responseLimit: false,
   },
 };
