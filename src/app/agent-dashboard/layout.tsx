@@ -7,6 +7,7 @@ import Image from "next/image";
 import { useUser } from "@/components/UserProvider";
 import { useSocket } from "@/contexts/SocketContext";
 import { Dialog, Transition } from "@headlessui/react";
+import { Analytics } from "@vercel/analytics/react";
 
 // Mark route as dynamic
 export const dynamic = "force-dynamic";
@@ -433,6 +434,7 @@ export default function AgentDashboardLayout({
           onClick={() => setSidebarOpen(false)}
         />
       )}
+      <Analytics />
     </div>
   );
 }

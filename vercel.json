@@ -42,6 +42,8 @@
     "NEXT_TELEMETRY_DISABLED": "1",
     "NEXT_DISABLE_SOURCEMAPS": "1",
     "NEXT_OUTPUT_STANDALONE": "true",
-    "NODE_OPTIONS": "--max-old-space-size=4096"
+    "NODE_OPTIONS": "--max-old-space-size=4096",
+    "JWT_SECRET": "${env.JWT_SECRET}",
+    "ALLOW_DEBUG_LOGIN": "true"
   }
 }
