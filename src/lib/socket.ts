@@ -1,10 +1,11 @@
 import { Server } from "socket.io";
 import { Server as HttpServer } from "http";
-import { PrismaClient } from "@prisma/client";
-import { ServerToClientEvents, ClientToServerEvents } from "@/types/socketTypes";
+import {
+  ServerToClientEvents,
+  ClientToServerEvents,
+} from "@/types/socketTypes";
 import { Message } from "@/types/chatTypes";
-
-const prisma = new PrismaClient();
+import { prisma } from "@/lib/db";
 
 export function initializeSocket(server: HttpServer) {
   const io = new Server<ClientToServerEvents, ServerToClientEvents>(server, {
@@ -30,39 +31,45 @@ export function initializeSocket(server: HttpServer) {
     });
 
     // Handle sending a message
-    socket.on("sendMessage", async (message: Omit<Message, 'id' | 'timestamp'>) => {
-      try {
-        if (!message.chatSessionId) {
-          console.error("Message missing chatSessionId");
-          return;
+    socket.on(
+      "sendMessage",
+      async (message: Omit<Message, "id" | "timestamp">) => {
+        try {
+          if (!message.chatSessionId) {
+            console.error("Message missing chatSessionId");
+            return;
+          }
+
+          // Save message to database
+          const savedMessage = await prisma.message.create({
+            data: {
+              sessionId: message.chatSessionId,
+              content: message.content,
+              role: message.role,
+              timestamp: new Date(),
+              category: message.category || undefined,
+              metadata: message.metadata || null,
+            },
+          });
+
+          // Broadcast message to all clients in the session
+          const broadcastMessage: Message = {
+            ...savedMessage,
+            timestamp: savedMessage.timestamp.toISOString(),
+            role: savedMessage.role as "agent" | "customer" | "system",
+            category: savedMessage.category || undefined,
+            metadata: savedMessage.metadata || undefined,
+          };
+
+          io.to(message.chatSessionId).emit(
+            "messageReceived",
+            broadcastMessage
+          );
+        } catch (error) {
+          console.error("Error saving message:", error);
         }
-
-        // Save message to database
-        const savedMessage = await prisma.message.create({
-          data: {
-            sessionId: message.chatSessionId,
-            content: message.content,
-            role: message.role,
-            timestamp: new Date(),
-            category: message.category || undefined,
-            metadata: message.metadata || null,
-          },
-        });
-
-        // Broadcast message to all clients in the session
-        const broadcastMessage: Message = {
-          ...savedMessage,
-          timestamp: savedMessage.timestamp.toISOString(),
-          role: savedMessage.role as "agent" | "customer" | "system",
-          category: savedMessage.category || undefined,
-          metadata: savedMessage.metadata || undefined,
-        };
-
-        io.to(message.chatSessionId).emit("messageReceived", broadcastMessage);
-      } catch (error) {
-        console.error("Error saving message:", error);
       }
-    });
+    );
 
     // Handle typing indicators
     socket.on("typing", (data) => {
@@ -120,4 +127,4 @@ export function initializeSocket(server: HttpServer) {
   });
 
   return io;
-} 
+}

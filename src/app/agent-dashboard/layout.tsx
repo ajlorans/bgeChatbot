@@ -6,6 +6,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { useUser } from "@/components/UserProvider";
 import { useSocket } from "@/contexts/SocketContext";
+import { Dialog, Transition } from "@headlessui/react";
+
+// Mark route as dynamic
+export const dynamic = "force-dynamic";
 
 export default function AgentDashboardLayout({
   children,
@@ -15,7 +19,7 @@ export default function AgentDashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const { user, loading, logout } = useUser();
-  const { socket, isConnected } = useSocket();
+  const socketContext = useSocket();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Check authentication status
@@ -33,8 +37,8 @@ export default function AgentDashboardLayout({
 
   // Update agent status via socket
   const updateStatus = (status: string) => {
-    if (socket && isConnected) {
-      socket.emit("updateStatus", { status });
+    if (socketContext.socket && socketContext.isConnected) {
+      socketContext.socket.emit("updateStatus", { status });
     }
   };
 
@@ -303,14 +307,16 @@ export default function AgentDashboardLayout({
               <Link
                 href="/agent-dashboard/agents"
                 className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
-                  pathname?.includes("/agents") && !pathname?.includes("/settings")
+                  pathname?.includes("/agents") &&
+                  !pathname?.includes("/settings")
                     ? "bg-blue-100 text-blue-700"
                     : "text-gray-600 hover:bg-gray-50"
                 }`}
               >
                 <svg
                   className={`mr-3 h-5 w-5 ${
-                    pathname?.includes("/agents") && !pathname?.includes("/settings")
+                    pathname?.includes("/agents") &&
+                    !pathname?.includes("/settings")
                       ? "text-blue-500"
                       : "text-gray-400 group-hover:text-gray-500"
                   }`}
@@ -413,10 +419,10 @@ export default function AgentDashboardLayout({
         <div className="flex items-center text-sm text-gray-500">
           <span
             className={`h-2 w-2 rounded-full mr-2 ${
-              isConnected ? "bg-green-500" : "bg-red-500"
+              socketContext.isConnected ? "bg-green-500" : "bg-red-500"
             }`}
           ></span>
-          {isConnected ? "Connected" : "Disconnected"}
+          {socketContext.isConnected ? "Connected" : "Disconnected"}
         </div>
       </footer>
 
