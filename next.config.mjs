@@ -22,11 +22,20 @@ const nextConfig = {
   // Configure static and dynamic page behavior
   output: "standalone",
   // Skip static optimization for database-heavy pages
-  unstable_excludeFiles: [
-    "**/src/app/agent-dashboard/**",
-    "**/src/app/agent/sessions/**",
-    "**/src/app/api/**",
-  ],
+  unstable_excludeFiles: ["**/src/app/agent/sessions/**", "**/src/app/api/**"],
+  // Set up rewrites to ensure routes work correctly
+  async rewrites() {
+    return [
+      {
+        source: "/agent-dashboard",
+        destination: "/agent-dashboard",
+      },
+      {
+        source: "/agent-dashboard/:path*",
+        destination: "/agent-dashboard/:path*",
+      },
+    ];
+  },
 };
 
 export default nextConfig;
