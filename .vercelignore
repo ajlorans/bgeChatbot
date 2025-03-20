@@ -6,4 +6,8 @@ prisma/migrations
 prisma/dev.db
 prisma/*.db
 prisma/*.db-journal
-prisma/seed.ts 
+prisma/seed.ts
+
+# Debugging and test files
+scripts/test-connection.js
+cypress 
